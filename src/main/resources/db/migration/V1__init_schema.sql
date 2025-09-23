@@ -173,5 +173,68 @@ CREATE TABLE api_usage_logs
         REFERENCES api_clients (id) ON DELETE CASCADE
 );
 
+-- =========================
+-- Wishlist & Wishlist Items
+-- =========================
+CREATE TABLE wishlists
+(
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id    UUID NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_wishlists_users FOREIGN KEY (user_id)
+        REFERENCES users (id) ON DELETE CASCADE
+);
+
+CREATE TABLE wishlist_items
+(
+    id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    wishlist_id        UUID NOT NULL,
+    product_variant_id UUID NOT NULL,
+    created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_wishlist_items_wishlist FOREIGN KEY (wishlist_id)
+        REFERENCES wishlists (id) ON DELETE CASCADE,
+    CONSTRAINT fk_wishlist_items_variant FOREIGN KEY (product_variant_id)
+        REFERENCES product_variants (id) ON DELETE CASCADE
+);
+-- =========================
+-- Cart & Cart Items
+-- =========================
+CREATE TABLE carts
+(
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id    UUID NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_carts_users FOREIGN KEY (user_id)
+        REFERENCES users (id) ON DELETE CASCADE
+);
+
+CREATE TABLE cart_items
+(
+    id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    cart_id            UUID NOT NULL,
+    product_variant_id UUID NOT NULL,
+    quantity           INT  NOT NULL,
+    created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_cart_items_cart FOREIGN KEY (cart_id)
+        REFERENCES carts (id) ON DELETE CASCADE,
+    CONSTRAINT fk_cart_items_variant FOREIGN KEY (product_variant_id)
+        REFERENCES product_variants (id) ON DELETE CASCADE
+);
+-- =========================
+-- Coupons
+-- =========================
+CREATE TABLE coupons
+(
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code          VARCHAR(50) UNIQUE NOT NULL,
+    discount_type VARCHAR(50) NOT NULL, -- PERCENTAGE, FIXED
+    discount_value DECIMAL(12, 2) NOT NULL,
+    max_uses      INT DEFAULT 1,
+    expires_at    TIMESTAMP,
+    is_active     BOOLEAN DEFAULT TRUE,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 
 
