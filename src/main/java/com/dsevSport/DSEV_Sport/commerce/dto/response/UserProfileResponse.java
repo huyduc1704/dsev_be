@@ -1,21 +1,21 @@
-package com.dsevSport.DSEV_Sport.commerce.dto.request;
+package com.dsevSport.DSEV_Sport.commerce.dto.response;
 
-import com.dsevSport.DSEV_Sport.common.util.enums.UserRole;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.util.List;
+import java.util.UUID;
 
 @Data
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class RegisterRequest {
+public class UserProfileResponse {
+    UUID id;
     String username;
     String email;
-    String password;
     String phoneNumber;
-    UserRole role;
-    List<AddressRequest> addresses;
+    String role;
+    List<AddressResponse> addresses;
 }

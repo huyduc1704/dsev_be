@@ -4,6 +4,7 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+DSEV.puml
 .env
 ### STS ###
 .apt_generated

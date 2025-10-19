@@ -1,4 +1,4 @@
-package com.dsevSport.DSEV_Sport.common.util;
+package com.dsevSport.DSEV_Sport.common.util.enums;
 
 public enum OrderStatus {
     PENDING,

@@ -1,0 +1,29 @@
+@startuml
+actor User
+
+rectangle "Frontend (React/Web/App)" as FE {
+  User --> FE : Login, Try-on, Orders
+}
+
+rectangle "Spring Boot Service" as SB {
+  [Auth & Users]
+  [Catalog & Products]
+  [Orders & Payments]
+  [Try-on Sessions API]
+}
+
+rectangle "Python Worker (AI Service)" as PY {
+  [Model Inference (TryOnDiffusion)]
+  [Pre/Post-processing]
+}
+
+rectangle "Database (Postgres)" as DB
+rectangle "Object Storage (S3/MinIO)" as ST
+
+FE --> SB : REST API calls
+SB --> DB : Store users, products, orders, tryon_sessions
+SB --> PY : Send job (via API/Queue)
+PY --> ST : Upload output image
+PY --> DB : Update tryon_sessions (READY/FAILED)
+SB --> FE : Return status + image URL
+@enduml

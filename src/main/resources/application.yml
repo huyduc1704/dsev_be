@@ -49,3 +49,12 @@ logging:
 jwt:
   secret-key: ${JWT_SECRET}
   expiration-time: 3600000
+
+vnpay:
+  tmn-code: U076XPCJ
+  hash-secret: W9ON2OIJ0ESA89WV2TH9Z6JVQIK9NU1V
+  url: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+  return-url: http://localhost:8080/api/v1/payment/vnpay/callback
+  version: 2.1.0
+  command: pay
+  order-type: other

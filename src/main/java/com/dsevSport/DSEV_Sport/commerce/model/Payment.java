@@ -1,11 +1,8 @@
 package com.dsevSport.DSEV_Sport.commerce.model;
 
-import com.dsevSport.DSEV_Sport.common.util.PaymentStatus;
+import com.dsevSport.DSEV_Sport.common.util.enums.PaymentStatus;
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.math.BigDecimal;
@@ -13,7 +10,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Data
+@Getter @Setter @Builder
 @AllArgsConstructor
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -39,6 +36,9 @@ public class Payment {
 
     @Column(name = "transaction_id", unique = true, nullable = false)
     String transactionId;
+
+    @Column(name = "bank_code")
+    String bankCode;
 
     @Column(name = "created_at")
     LocalDateTime createdAt;

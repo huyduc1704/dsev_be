@@ -1,6 +1,6 @@
 package com.dsevSport.DSEV_Sport.commerce.model;
 
-import com.dsevSport.DSEV_Sport.common.util.OrderStatus;
+import com.dsevSport.DSEV_Sport.common.util.enums.OrderStatus;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;

@@ -1,6 +1,6 @@
 package com.dsevSport.DSEV_Sport.commerce.model;
 
-import com.dsevSport.DSEV_Sport.common.util.UserRole;
+import com.dsevSport.DSEV_Sport.common.util.enums.UserRole;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -63,13 +63,14 @@ public class User implements UserDetails {
         a.setUser(null);
     }
 
-    @Override
-    public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of();
-    }
 
     @Override
     public String getPassword() {
         return passwordHash;
+    }
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return List.of(() -> "ROLE_" + role.name());
     }
 }

@@ -24,7 +24,7 @@ public class AuthenticationController {
                         ApiResponse.builder()
                                 .message("Register")
                                 .data(authenticationService.register(request))
-                                .errorCode(null)
+                                .code(200)
                                 .build()
                 );
     }
@@ -36,7 +36,7 @@ public class AuthenticationController {
                         ApiResponse.builder()
                                 .message("Login success")
                                 .data(authenticationService.login(request))
-                                .errorCode(null)
+                                .code(200)
                                 .build()
                 );
     }

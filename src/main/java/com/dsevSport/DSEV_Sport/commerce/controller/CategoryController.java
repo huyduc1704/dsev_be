@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/categories")
+@RequestMapping("/api/v1/categories")
 @RequiredArgsConstructor
 public class CategoryController {
     private final CategoryService service;
@@ -24,7 +24,7 @@ public class CategoryController {
                 ApiResponse.<List<CategoryResponse>>builder()
                         .data(service.getAllCategories())
                         .message("Categories retrieved successfully")
-                        .success(true)
+                        .code(200)
                         .build()
         );
     }
@@ -34,7 +34,7 @@ public class CategoryController {
                 ApiResponse.<CategoryResponse>builder()
                         .data(service.getCategoryById(id))
                         .message("Category retrieved successfully")
-                        .success(true)
+                        .code(200)
                         .build()
         );
     }
@@ -44,7 +44,7 @@ public class CategoryController {
                 ApiResponse.<CategoryResponse>builder()
                         .data(service.createCategory(request))
                         .message("Category created successfully")
-                        .success(true)
+                        .code(200)
                         .build()
         );
     }
@@ -54,7 +54,7 @@ public class CategoryController {
                 ApiResponse.<CategoryResponse>builder()
                         .data(service.updateCategory(id, request))
                         .message("Category updated successfully")
-                        .success(true)
+                        .code(200)
                         .build()
         );
     }
@@ -64,7 +64,7 @@ public class CategoryController {
         return ResponseEntity.ok(
                 ApiResponse.<Void>builder()
                         .message("Category deleted successfully")
-                        .success(true)
+                        .code(200)
                         .build()
         );
     }

@@ -5,7 +5,11 @@ import com.dsevSport.DSEV_Sport.commerce.dto.response.ProductResponse;
 import com.dsevSport.DSEV_Sport.commerce.mapper.ProductMapper;
 import com.dsevSport.DSEV_Sport.commerce.model.Product;
 import com.dsevSport.DSEV_Sport.commerce.repository.ProductRepository;
+import com.dsevSport.DSEV_Sport.commerce.specification.ProductSpecification;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -65,5 +69,13 @@ public class ProductServiceImpl implements ProductService {
             throw new IllegalArgumentException("Product not found with id: " + id);
         }
         repository.deleteById(id);
+    }
+
+    @Override
+    public Page<ProductResponse> filterProducts(String search, String brand, Double minPrice, Double maxPrice, Boolean active, UUID categoryId, Pageable pageable) {
+        Specification<Product> spec = ProductSpecification.hasBrand(brand)
+                .and(ProductSpecification.priceBetween(minPrice, maxPrice))
+                .and(ProductSpecification.isActive(active));
+        return repository.findAll(spec, pageable).map(mapper::toResponse);
     }
 }
