@@ -12,7 +12,7 @@ public class DsevSportApplication {
 		SpringApplication.run(DsevSportApplication.class, args);
 	}
 
-	@Value("${DB_USER}")
+	@Value("${SPRING_DATASOURCE_URL}")
 	private String dbUser;
 
 	@PostConstruct
