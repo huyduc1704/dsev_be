@@ -20,8 +20,8 @@ public class ProductVariant {
     @GeneratedValue(strategy = GenerationType.UUID)
     UUID id;
 
-    @ManyToOne
-    @JoinColumn(name = "product_id", insertable = false, updatable = false, nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id", nullable = false)
     Product product;
 
     String color;

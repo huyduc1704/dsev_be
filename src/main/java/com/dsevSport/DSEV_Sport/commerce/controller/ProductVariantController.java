@@ -15,28 +15,13 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1")  // ✅ Đổi base path
+@RequestMapping("/api/v1/products/{productId}/variants")
 @RequiredArgsConstructor
 public class ProductVariantController {
     private final ProductVariantService service;
 
-    // Admin: Quản lý tất cả variants
-    @PreAuthorize("hasRole('ADMIN')")
-    @GetMapping("/product-variants")
-    public ResponseEntity<ApiResponse<List<ProductVariantResponse>>> getAllVariants() {
-        return ResponseEntity.ok(
-                ApiResponse.<List<ProductVariantResponse>>builder()
-                        .data(service.getAllVariants())
-                        .message("Variants retrieved successfully")
-                        .code(200)
-                        .build()
-        );
-    }
-
-    // Public: Get variants của 1 product
-    @GetMapping("/products/{productId}/variants")
-    public ResponseEntity<ApiResponse<List<ProductVariantResponse>>> getVariantsByProduct(
-            @PathVariable UUID productId) {
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<ProductVariantResponse>>> getVariantsByProduct(@PathVariable UUID productId) {
         return ResponseEntity.ok(
                 ApiResponse.<List<ProductVariantResponse>>builder()
                         .data(service.getVariantsByProductId(productId))
@@ -46,22 +31,22 @@ public class ProductVariantController {
         );
     }
 
-    // Public: Get 1 variant
-    @GetMapping("/{id}")
+    @GetMapping("/{variantId}")
     public ResponseEntity<ApiResponse<ProductVariantResponse>> getVariantById(
-            @PathVariable UUID id) {
+            @PathVariable UUID productId,
+            @PathVariable UUID variantId) {
+        // call service with variantId only (service signature expects single UUID)
         return ResponseEntity.ok(
                 ApiResponse.<ProductVariantResponse>builder()
-                        .data(service.getVariantById(id))
+                        .data(service.getVariantById(variantId))
                         .message("Variant retrieved successfully")
                         .code(200)
                         .build()
         );
     }
 
-    // Admin: Create variant
     @PreAuthorize("hasRole('ADMIN')")
-    @PostMapping("/products/{productId}/variants")
+    @PostMapping
     public ResponseEntity<ApiResponse<ProductVariantResponse>> createVariant(
             @PathVariable UUID productId,
             @Valid @RequestBody ProductVariantRequest request) {
@@ -75,26 +60,29 @@ public class ProductVariantController {
         );
     }
 
-    // Admin: Update variant
     @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
-    @PutMapping("/{id}")
+    @PutMapping("/{variantId}")
     public ResponseEntity<ApiResponse<ProductVariantResponse>> updateVariant(
-            @PathVariable UUID id,
+            @PathVariable UUID productId,
+            @PathVariable UUID variantId,
             @Valid @RequestBody ProductVariantRequest request) {
+        // call service with variantId only
         return ResponseEntity.ok(
                 ApiResponse.<ProductVariantResponse>builder()
-                        .data(service.updateVariant(id, request))
+                        .data(service.updateVariant(variantId, request))
                         .message("Variant updated successfully")
                         .code(200)
                         .build()
         );
     }
 
-    // Admin: Delete variant
     @PreAuthorize("hasRole('ADMIN')")
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteVariant(@PathVariable UUID id) {
-        service.deleteVariant(id);
+    @DeleteMapping("/{variantId}")
+    public ResponseEntity<Void> deleteVariant(
+            @PathVariable UUID productId,
+            @PathVariable UUID variantId) {
+        // call service with variantId only
+        service.deleteVariant(variantId);
         return ResponseEntity.noContent().build();
     }
 }
