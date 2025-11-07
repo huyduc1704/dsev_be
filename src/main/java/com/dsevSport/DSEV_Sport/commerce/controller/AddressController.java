@@ -3,6 +3,7 @@ package com.dsevSport.DSEV_Sport.commerce.controller;
 import com.dsevSport.DSEV_Sport.commerce.dto.request.AddressRequest;
 import com.dsevSport.DSEV_Sport.commerce.dto.response.ApiResponse;
 import com.dsevSport.DSEV_Sport.commerce.service.AddressService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
+@Tag(name = "Addresses", description = "Address management endpoints")
 @RestController
 @RequestMapping("/api/v1/me/addresses")
 @RequiredArgsConstructor

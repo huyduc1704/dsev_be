@@ -4,6 +4,7 @@ import com.dsevSport.DSEV_Sport.commerce.dto.request.ProductRequest;
 import com.dsevSport.DSEV_Sport.commerce.dto.response.ApiResponse;
 import com.dsevSport.DSEV_Sport.commerce.dto.response.ProductResponse;
 import com.dsevSport.DSEV_Sport.commerce.service.ProductService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
+@Tag(name = "Products", description = "Product management endpoints")
 @RestController
 @RequestMapping("/api/v1/products")
 @RequiredArgsConstructor

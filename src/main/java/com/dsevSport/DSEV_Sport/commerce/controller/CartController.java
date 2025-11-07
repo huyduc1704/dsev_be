@@ -5,6 +5,7 @@ import com.dsevSport.DSEV_Sport.commerce.dto.request.UpdateCartItemRequest;
 import com.dsevSport.DSEV_Sport.commerce.dto.response.ApiResponse;
 import com.dsevSport.DSEV_Sport.commerce.dto.response.CartResponse;
 import com.dsevSport.DSEV_Sport.commerce.service.CartService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
+@Tag(name = "Cart", description = "Shopping cart management endpoints")
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor

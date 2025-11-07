@@ -4,6 +4,7 @@ import com.dsevSport.DSEV_Sport.commerce.dto.request.PaymentRequest;
 import com.dsevSport.DSEV_Sport.commerce.dto.response.ApiResponse;
 import com.dsevSport.DSEV_Sport.commerce.dto.response.PaymentResponse;
 import com.dsevSport.DSEV_Sport.commerce.service.PaymentService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
+@Tag(name = "Payments", description = "Payment processing endpoints")
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor

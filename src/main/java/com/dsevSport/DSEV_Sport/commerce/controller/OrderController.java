@@ -6,6 +6,7 @@ import com.dsevSport.DSEV_Sport.commerce.dto.response.ApiResponse;
 import com.dsevSport.DSEV_Sport.commerce.dto.response.OrderResponse;
 import com.dsevSport.DSEV_Sport.commerce.service.OrderService;
 import com.dsevSport.DSEV_Sport.common.util.enums.OrderStatus;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
+@Tag(name = "Orders", description = "Order management endpoints")
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor

@@ -4,6 +4,7 @@ import com.dsevSport.DSEV_Sport.commerce.dto.request.LoginRequest;
 import com.dsevSport.DSEV_Sport.commerce.dto.request.RegisterRequest;
 import com.dsevSport.DSEV_Sport.commerce.dto.response.ApiResponse;
 import com.dsevSport.DSEV_Sport.commerce.service.AuthenticationService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "Authentication", description = "Authentication endpoints")
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor

@@ -4,6 +4,7 @@ import com.dsevSport.DSEV_Sport.commerce.dto.request.CategoryRequest;
 import com.dsevSport.DSEV_Sport.commerce.dto.response.ApiResponse;
 import com.dsevSport.DSEV_Sport.commerce.dto.response.CategoryResponse;
 import com.dsevSport.DSEV_Sport.commerce.service.CategoryService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
+@Tag(name = "Categories", description = "Category management endpoints")
 @RestController
 @RequestMapping("/api/v1/categories")
 @RequiredArgsConstructor
