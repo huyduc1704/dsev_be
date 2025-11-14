@@ -35,6 +35,7 @@ public class Order {
     BigDecimal totalPrice;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
     OrderStatus status;
 
     @Column(name = "order_number", unique = true, nullable = false)

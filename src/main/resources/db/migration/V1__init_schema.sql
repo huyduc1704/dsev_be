@@ -2,7 +2,7 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TYPE user_role AS ENUM ('CUSTOMER', 'ADMIN', 'STAFF', 'MODERATOR');
-CREATE TYPE order_status AS ENUM ('PENDING', 'COMPLETED', 'CANCELLED', 'SHIPPED', 'DELIVERED', 'RETURNED');
+CREATE TYPE order_status AS ENUM ('PENDING', 'COMPLETED', 'CANCELED', 'SHIPPED', 'DELIVERED', 'RETURNED');
 CREATE TYPE payment_status AS ENUM ('PENDING', 'SUCCESS', 'FAILED');
 
 -- Users & Addresses
@@ -68,7 +68,7 @@ CREATE TABLE orders (
                         user_id UUID NOT NULL,
                         address_id UUID,
                         total_price DECIMAL(12, 2) NOT NULL,
-                        status order_status DEFAULT 'PENDING',
+                        status order_status NOT NULL,
                         order_number VARCHAR(100) UNIQUE NOT NULL,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
