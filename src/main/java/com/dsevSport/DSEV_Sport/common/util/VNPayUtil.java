@@ -18,25 +18,26 @@ public class VNPayUtil {
             byte[] result = hmac512.doFinal(data.getBytes(StandardCharsets.UTF_8));
             StringBuilder sb = new StringBuilder(2 * result.length);
             for (byte b : result) {
-                sb.append(String.format("%02x", b));
+                sb.append(String.format("%02X", b)); // uppercase hex
             }
             return sb.toString();
         } catch (Exception ex) {
-            return "";
+            throw new RuntimeException("Failed to generate HMAC: " + ex.getMessage(), ex);
         }
     }
 
     public String getIpAddress(HttpServletRequest request) {
-        String ipAddress;
-        try {
-            ipAddress = request.getHeader("X-FORWARDED-FOR");
-            if (ipAddress == null) {
-                ipAddress = request.getRemoteAddr();
-            }
-        } catch (Exception ex) {
-            ipAddress = "Invalid IP: " + ex.getMessage();
+        String ip = request.getHeader("X-FORWARDED-FOR");
+        if (ip == null || ip.isEmpty()) {
+            ip = request.getRemoteAddr();
         }
-        return ipAddress;
+
+        // Fix IPv6 localhost (::1)
+        if ("0:0:0:0:0:0:0:1".equals(ip) || "::1".equals(ip)) {
+            ip = "127.0.0.1";
+        }
+
+        return ip;
     }
 
     public String getRandomNumber(int len) {

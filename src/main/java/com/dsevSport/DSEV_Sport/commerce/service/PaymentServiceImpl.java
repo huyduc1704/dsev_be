@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -31,50 +32,69 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     public PaymentResponse createVNPayPayment(PaymentRequest request, HttpServletRequest httpServletRequest) {
         Map<String, String> vnp_Params = new HashMap<>();
+
         vnp_Params.put("vnp_Version", vnpayConfig.getVersion());
         vnp_Params.put("vnp_Command", vnpayConfig.getCommand());
         vnp_Params.put("vnp_TmnCode", vnpayConfig.getTmnCode());
+
         if (request.getAmount() != null) {
             BigDecimal amt = BigDecimal.valueOf(request.getAmount());
             long amountInMinor = amt.multiply(BigDecimal.valueOf(100)).longValue();
             vnp_Params.put("vnp_Amount", String.valueOf(amountInMinor));
         }
+
         vnp_Params.put("vnp_CurrCode", "VND");
-        vnp_Params.put("vnp_TxnRef", request.getOrderId());
-        vnp_Params.put("vnp_OrderInfo", "Thanh toan don hang: " + request.getOrderId());
+        vnp_Params.put("vnp_TxnRef", Optional.ofNullable(request.getOrderId()).orElse(UUID.randomUUID().toString()));
+        vnp_Params.put("vnp_OrderInfo", "Thanh toan don hang: " + Optional.ofNullable(request.getOrderId()).orElse(""));
         vnp_Params.put("vnp_OrderType", vnpayConfig.getOrderType());
         vnp_Params.put("vnp_Locale", "vn");
         vnp_Params.put("vnp_ReturnUrl", vnpayConfig.getReturnUrl());
         vnp_Params.put("vnp_IpAddr", VNPayUtil.getIpAddress(httpServletRequest));
-        vnp_Params.put("vnp_CreateDate", new java.text.SimpleDateFormat("yyyyMMddHHmmss").format(new java.util.Date()));
-        if (request.getBankCode() != null && !request.getBankCode().isEmpty()) {
-            vnp_Params.put("vnp_BankCode", request.getBankCode());
-        }
+
+        Calendar cld = Calendar.getInstance(TimeZone.getTimeZone("Etc/GMT+7"));
+        SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
+        String vnp_CreateDate = formatter.format(cld.getTime());
+        vnp_Params.put("vnp_CreateDate", vnp_CreateDate);
+        cld.add(Calendar.MINUTE, 15);
+        String vnp_ExpireDate = formatter.format(cld.getTime());
+        vnp_Params.put("vnp_ExpireDate", vnp_ExpireDate);
 
         List<String> fieldNames = new ArrayList<>(vnp_Params.keySet());
         Collections.sort(fieldNames);
 
-        StringJoiner hashJoiner = new StringJoiner("&");
-        StringJoiner queryJoiner = new StringJoiner("&");
-        for (String fieldName : fieldNames) {
-            String value = vnp_Params.get(fieldName);
-            if (value != null && value.length() > 0) {
-                hashJoiner.add(fieldName + "=" + value); // raw for signing
-                queryJoiner.add(URLEncoder.encode(fieldName, StandardCharsets.UTF_8)
-                        + "=" + URLEncoder.encode(value, StandardCharsets.UTF_8)); // encoded for URL
+        StringBuilder hashData = new StringBuilder();
+        StringBuilder query = new StringBuilder();
+
+        Iterator<String> itr = fieldNames.iterator();
+        while (itr.hasNext()) {
+            String fieldName = itr.next();
+            String fieldValue = vnp_Params.get(fieldName);
+            if (fieldValue != null && !fieldValue.isEmpty()) {
+                try {
+                    // use UTF-8 and catch the checked exception
+                    String encodedValue = URLEncoder.encode(fieldValue, StandardCharsets.UTF_8.name());
+                    hashData.append(fieldName).append('=').append(encodedValue);
+                    query.append(URLEncoder.encode(fieldName, StandardCharsets.UTF_8.name()))
+                            .append('=')
+                            .append(encodedValue);
+                    if (itr.hasNext()) {
+                        query.append('&');
+                        hashData.append('&');
+                    }
+                } catch (java.io.UnsupportedEncodingException e) {
+                    // This should never happen for UTF-8, rethrow as unchecked to fail fast
+                    throw new RuntimeException("Encoding error while building VNPay request", e);
+                }
             }
         }
 
-        String hashData = hashJoiner.toString();
-        String query = queryJoiner.toString();
+        String hashDataStr = hashData.toString();
+        String queryUrl = query.toString();
 
-        String secureHash = VNPayUtil.hmacSHA512(vnpayConfig.getHashSecret(), hashData);
+        String vnp_SecureHash = VNPayUtil.hmacSHA512(vnpayConfig.getHashSecret(), hashDataStr);
+        queryUrl += "&vnp_SecureHashType=SHA512&vnp_SecureHash=" + vnp_SecureHash;
 
-        // append secureHashType and secureHash
-        query += "&vnp_SecureHashType=" + URLEncoder.encode("SHA512", StandardCharsets.UTF_8)
-                + "&vnp_SecureHash=" + secureHash;
-
-        String paymentUrl = vnpayConfig.getUrl() + "?" + query;
+        String paymentUrl = vnpayConfig.getUrl() + "?" + queryUrl;
 
         return PaymentResponse.builder()
                 .code("00")
@@ -82,7 +102,6 @@ public class PaymentServiceImpl implements PaymentService {
                 .paymentUrl(paymentUrl)
                 .build();
     }
-
 
     @Override
     public void handleVNPayReturn(HttpServletRequest request) {
@@ -92,9 +111,9 @@ public class PaymentServiceImpl implements PaymentService {
         String bankCode = request.getParameter("vnp_BankCode");
         String amountStr = request.getParameter("vnp_Amount");
 
-        java.math.BigDecimal amount = null;
+        BigDecimal amount = null;
         if (amountStr != null && !amountStr.isEmpty()) {
-            amount = new java.math.BigDecimal(amountStr).divide(new java.math.BigDecimal(100));
+            amount = new BigDecimal(amountStr).divide(new BigDecimal(100));
         }
 
         Optional<Order> orderOpt = orderRepository.findByOrderNumber(orderNumber);

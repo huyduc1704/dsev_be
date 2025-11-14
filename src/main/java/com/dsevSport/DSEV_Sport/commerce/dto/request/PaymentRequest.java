@@ -10,7 +10,6 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class PaymentRequest {
     String orderId;
-    String bankCode;
     Double amount;
     String paymentMethod;
     String transactionId;
