@@ -42,10 +42,18 @@ public class PaymentController {
     }
 
     @PermitAll
-    @RequestMapping(path = "/payment/vnpay/callback", method = {RequestMethod.GET, RequestMethod.POST})
-    public ResponseEntity<Void> vnpayCallback(HttpServletRequest request) {
-        paymentService.handleVNPayReturn(request);
-        return ResponseEntity.noContent().build();
+    @GetMapping(value = "/vnpay/return-app", produces = "text/html; charset=UTF-8")
+    public String vnpayReturnApp(HttpServletRequest request) {
+        StringBuilder html = new StringBuilder();
+        html.append("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>VNPay Redirect</title></head><body>");
+        html.append("<script>");
+        html.append("const params = window.location.search;");
+        html.append("const target = 'dsev://vnpay/callback' + params;");
+        html.append("window.location.href = target;");
+        html.append("</script>");
+        html.append("<p>Đang chuyển hướng về ứng dụng...</p>");
+        html.append("</body></html>");
+        return html.toString();
     }
 
     @GetMapping("/orders/{orderId}/payment")

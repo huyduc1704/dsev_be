@@ -44,15 +44,20 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         vnp_Params.put("vnp_CurrCode", "VND");
-        String txnRef = Optional.ofNullable(request.getOrderId()).orElse(UUID.randomUUID().toString());
+
+        // *** NEW: always unique txnRef ***
+        String base = Optional.ofNullable(request.getOrderId()).orElse("");
+        String txnRef = base + "-" + VNPayUtil.getRandomNumber(6); // <= 34 chars
         vnp_Params.put("vnp_TxnRef", txnRef);
-        vnp_Params.put("vnp_OrderInfo", "Thanh toan don hang: " + Optional.ofNullable(request.getOrderId()).orElse(""));
+
+        vnp_Params.put("vnp_OrderInfo",
+                "Thanh toan don hang: " + Optional.ofNullable(request.getOrderId()).orElse(""));
         vnp_Params.put("vnp_OrderType", vnpayConfig.getOrderType());
         vnp_Params.put("vnp_Locale", "vn");
         vnp_Params.put("vnp_ReturnUrl", vnpayConfig.getReturnUrl());
         vnp_Params.put("vnp_IpAddr", VNPayUtil.getIpAddress(httpServletRequest));
 
-        Calendar cld = Calendar.getInstance();
+        Calendar cld = Calendar.getInstance(); // server TZ = Asia/Ho_Chi_Minh
         SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
         String vnp_CreateDate = formatter.format(cld.getTime());
         vnp_Params.put("vnp_CreateDate", vnp_CreateDate);
@@ -87,25 +92,22 @@ public class PaymentServiceImpl implements PaymentService {
             }
         }
 
-        String hashDataStr = hashData.toString();
-        String queryUrl = query.toString();
-
-        String vnp_SecureHash = VNPayUtil.hmacSHA512(vnpayConfig.getHashSecret(), hashDataStr);
-        queryUrl += "&vnp_SecureHashType=SHA512&vnp_SecureHash=" + vnp_SecureHash;
-
+        String vnp_SecureHash = VNPayUtil.hmacSHA512(vnpayConfig.getHashSecret(), hashData.toString());
+        String queryUrl = query + "&vnp_SecureHashType=SHA512&vnp_SecureHash=" + vnp_SecureHash;
         String paymentUrl = vnpayConfig.getUrl() + "?" + queryUrl;
 
         if (request.getOrderId() != null) {
             orderRepository.findByOrderNumber(request.getOrderId()).ifPresent(order -> {
-                // avoid duplicate transaction_id constraint violation
+                // pre-create payment mapped by txnRef
+                BigDecimal amountDecimal = BigDecimal.ZERO;
+                String amtStr = vnp_Params.get("vnp_Amount");
+                if (amtStr != null && !amtStr.isEmpty()) {
+                    try {
+                        amountDecimal = new BigDecimal(amtStr).divide(new BigDecimal(100));
+                    } catch (NumberFormatException ignored) { }
+                }
+                // if existed PENDING with same txnRef then skip
                 if (paymentRepository.findByTransactionId(txnRef).isEmpty()) {
-                    BigDecimal amountDecimal = BigDecimal.ZERO;
-                    String amtStr = vnp_Params.get("vnp_Amount");
-                    if (amtStr != null && !amtStr.isEmpty()) {
-                        try {
-                            amountDecimal = new BigDecimal(amtStr).divide(new BigDecimal(100));
-                        } catch (NumberFormatException ignored) { /* fallback to ZERO */ }
-                    }
                     Payment prePayment = Payment.builder()
                             .order(order)
                             .transactionId(txnRef)
@@ -119,7 +121,7 @@ public class PaymentServiceImpl implements PaymentService {
                 }
             });
         }
-
+        System.out.println("VNPay paymentUrl = " + paymentUrl);
         return PaymentResponse.builder()
                 .code("00")
                 .message("Success")
@@ -129,38 +131,45 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     public void handleVNPayReturn(HttpServletRequest request) {
-        String orderNumber = request.getParameter("vnp_TxnRef");
+        String txnRef = request.getParameter("vnp_TxnRef");
         String responseCode = request.getParameter("vnp_ResponseCode");
-        String transactionId = request.getParameter("vnp_TransactionNo");
+        String vnpTransactionNo = request.getParameter("vnp_TransactionNo");
         String bankCode = request.getParameter("vnp_BankCode");
         String amountStr = request.getParameter("vnp_Amount");
+
+        System.out.printf(
+                "VNPay return: vnp_TxnRef=%s, vnp_ResponseCode=%s, vnp_Amount=%s, vnp_CreateDate=%s, vnp_ExpireDate=%s%n",
+                request.getParameter("vnp_TxnRef"),
+                request.getParameter("vnp_ResponseCode"),
+                request.getParameter("vnp_Amount"),
+                request.getParameter("vnp_CreateDate"),
+                request.getParameter("vnp_ExpireDate")
+        );
 
         BigDecimal amount = null;
         if (amountStr != null && !amountStr.isEmpty()) {
             amount = new BigDecimal(amountStr).divide(new BigDecimal(100));
         }
 
-        Optional<Order> orderOpt = orderRepository.findByOrderNumber(orderNumber);
-        if (orderOpt.isPresent()) {
-            Order order = orderOpt.get();
-            if ("00".equals(responseCode)) {
-                order.setStatus(OrderStatus.COMPLETED);
-            } else {
-                order.setStatus(OrderStatus.CANCELED);
-            }
-            orderRepository.save(order);
+        final BigDecimal finalAmount = amount;
 
-            Payment payment = Payment.builder()
-                    .order(order)
-                    .transactionId(transactionId)
-                    .amount(amount)
-                    .bankCode(bankCode)
-                    .status("00".equals(responseCode) ? PaymentStatus.SUCCESS : PaymentStatus.FAILED)
-                    .paymentMethod("VNPAY")
-                    .createdAt(LocalDateTime.now())
-                    .build();
+        paymentRepository.findByTransactionId(txnRef).ifPresent(payment -> {
+            if ("00".equals(responseCode)) {
+                payment.setStatus(PaymentStatus.SUCCESS);
+                payment.getOrder().setStatus(OrderStatus.COMPLETED);
+            } else {
+                payment.setStatus(PaymentStatus.FAILED);
+                payment.getOrder().setStatus(OrderStatus.CANCELED);
+            }
+            payment.setBankCode(bankCode);
+            // payment.setGatewayTransId(vnpTransactionNo);
+            if (finalAmount != null) {
+                payment.setAmount(finalAmount);
+            }
+
+            orderRepository.save(payment.getOrder());
             paymentRepository.save(payment);
-        }
+        });
     }
 
     @Override

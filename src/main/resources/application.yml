@@ -54,7 +54,7 @@ vnpay:
   tmn-code: U076XPCJ
   hash-secret: GA0D97UIT7YGLYJ5QGIGRM3F7Z2URE1W
   url: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
-  return-url: dsev://vnpay/callback
+  return-url: http://34.63.203.101:8080/api/v1/vnpay/return-app
   version: 2.1.0
   command: pay
   order-type: other
