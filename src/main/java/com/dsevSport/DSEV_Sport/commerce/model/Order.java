@@ -24,11 +24,11 @@ public class Order {
     UUID id;
 
     @ManyToOne
-    @JoinColumn(name = "user_id", insertable = false, updatable = false, nullable = false)
+    @JoinColumn(name = "user_id", nullable = false)
     User user;
 
     @OneToOne
-    @JoinColumn(name = "address_id", insertable = false, updatable = false)
+    @JoinColumn(name = "address_id")
     Address address;
 
     @Column(name = "total_price", nullable = false)

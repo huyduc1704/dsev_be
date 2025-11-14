@@ -22,7 +22,7 @@ public class Product {
     UUID id;
 
     @ManyToOne
-    @JoinColumn(name = "category_id", insertable = false, updatable = false)
+    @JoinColumn(name = "category_id")
     Category category;
 
     @Column(name = "name", nullable = false)

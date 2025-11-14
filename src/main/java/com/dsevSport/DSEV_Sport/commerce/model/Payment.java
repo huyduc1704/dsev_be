@@ -21,7 +21,7 @@ public class Payment {
     UUID id;
 
     @OneToOne
-    @JoinColumn(name = "order_id", insertable = false, updatable = false, nullable = false)
+    @JoinColumn(name = "order_id", nullable = false)
     Order order;
 
     @Column(name = "amount", nullable = false)

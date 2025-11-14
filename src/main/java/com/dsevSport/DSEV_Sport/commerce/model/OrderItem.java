@@ -23,11 +23,11 @@ public class OrderItem {
     UUID id;
 
     @ManyToOne
-    @JoinColumn(name = "order_id", insertable = false, updatable = false, nullable = false)
+    @JoinColumn(name = "order_id", nullable = false)
     Order order;
 
     @ManyToOne
-    @JoinColumn(name = "product_variant_id", insertable = false, updatable = false, nullable = false)
+    @JoinColumn(name = "product_variant_id", nullable = false)
     ProductVariant productVariant;
 
     @Column(name = "quantity", nullable = false)
