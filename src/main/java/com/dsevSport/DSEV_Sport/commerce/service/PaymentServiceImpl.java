@@ -44,7 +44,8 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         vnp_Params.put("vnp_CurrCode", "VND");
-        vnp_Params.put("vnp_TxnRef", Optional.ofNullable(request.getOrderId()).orElse(UUID.randomUUID().toString()));
+        String txnRef = Optional.ofNullable(request.getOrderId()).orElse(UUID.randomUUID().toString());
+        vnp_Params.put("vnp_TxnRef", txnRef);
         vnp_Params.put("vnp_OrderInfo", "Thanh toan don hang: " + Optional.ofNullable(request.getOrderId()).orElse(""));
         vnp_Params.put("vnp_OrderType", vnpayConfig.getOrderType());
         vnp_Params.put("vnp_Locale", "vn");
@@ -71,7 +72,6 @@ public class PaymentServiceImpl implements PaymentService {
             String fieldValue = vnp_Params.get(fieldName);
             if (fieldValue != null && !fieldValue.isEmpty()) {
                 try {
-                    // use UTF-8 and catch the checked exception
                     String encodedValue = URLEncoder.encode(fieldValue, StandardCharsets.UTF_8.name());
                     hashData.append(fieldName).append('=').append(encodedValue);
                     query.append(URLEncoder.encode(fieldName, StandardCharsets.UTF_8.name()))
@@ -82,7 +82,6 @@ public class PaymentServiceImpl implements PaymentService {
                         hashData.append('&');
                     }
                 } catch (java.io.UnsupportedEncodingException e) {
-                    // This should never happen for UTF-8, rethrow as unchecked to fail fast
                     throw new RuntimeException("Encoding error while building VNPay request", e);
                 }
             }
@@ -95,6 +94,31 @@ public class PaymentServiceImpl implements PaymentService {
         queryUrl += "&vnp_SecureHashType=SHA512&vnp_SecureHash=" + vnp_SecureHash;
 
         String paymentUrl = vnpayConfig.getUrl() + "?" + queryUrl;
+
+        if (request.getOrderId() != null) {
+            orderRepository.findByOrderNumber(request.getOrderId()).ifPresent(order -> {
+                // avoid duplicate transaction_id constraint violation
+                if (paymentRepository.findByTransactionId(txnRef).isEmpty()) {
+                    BigDecimal amountDecimal = BigDecimal.ZERO;
+                    String amtStr = vnp_Params.get("vnp_Amount");
+                    if (amtStr != null && !amtStr.isEmpty()) {
+                        try {
+                            amountDecimal = new BigDecimal(amtStr).divide(new BigDecimal(100));
+                        } catch (NumberFormatException ignored) { /* fallback to ZERO */ }
+                    }
+                    Payment prePayment = Payment.builder()
+                            .order(order)
+                            .transactionId(txnRef)
+                            .amount(amountDecimal)
+                            .paymentMethod("VNPAY")
+                            .bankCode(null)
+                            .status(PaymentStatus.PENDING)
+                            .createdAt(LocalDateTime.now())
+                            .build();
+                    paymentRepository.save(prePayment);
+                }
+            });
+        }
 
         return PaymentResponse.builder()
                 .code("00")

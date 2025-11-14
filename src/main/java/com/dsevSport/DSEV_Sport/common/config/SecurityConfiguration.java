@@ -3,6 +3,7 @@ package com.dsevSport.DSEV_Sport.common.config;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -31,6 +32,8 @@ public class SecurityConfiguration {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/api/v1/products/**", "/api/v1/categories/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/payment/vnpay/callback").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/payment/vnpay/callback").permitAll()
                         .requestMatchers("/api/v1/users/profile").authenticated()
                         .requestMatchers("/api/v1/addresses/**").authenticated()
                         .anyRequest().authenticated()

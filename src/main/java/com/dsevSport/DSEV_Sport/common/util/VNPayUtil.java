@@ -18,7 +18,7 @@ public class VNPayUtil {
             byte[] result = hmac512.doFinal(data.getBytes(StandardCharsets.UTF_8));
             StringBuilder sb = new StringBuilder(2 * result.length);
             for (byte b : result) {
-                sb.append(String.format("%02X", b)); // uppercase hex
+                sb.append(String.format("%02x", b)); // lowercase hex
             }
             return sb.toString();
         } catch (Exception ex) {

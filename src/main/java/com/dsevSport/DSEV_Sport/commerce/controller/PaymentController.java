@@ -5,6 +5,7 @@ import com.dsevSport.DSEV_Sport.commerce.dto.response.ApiResponse;
 import com.dsevSport.DSEV_Sport.commerce.dto.response.PaymentResponse;
 import com.dsevSport.DSEV_Sport.commerce.service.PaymentService;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.security.PermitAll;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -36,6 +37,13 @@ public class PaymentController {
 
     @GetMapping("/payments/vnpay/return")
     public ResponseEntity<Void> handleVNPayReturn(HttpServletRequest request) {
+        paymentService.handleVNPayReturn(request);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PermitAll
+    @RequestMapping(path = "/payment/vnpay/callback", method = {RequestMethod.GET, RequestMethod.POST})
+    public ResponseEntity<Void> vnpayCallback(HttpServletRequest request) {
         paymentService.handleVNPayReturn(request);
         return ResponseEntity.noContent().build();
     }
