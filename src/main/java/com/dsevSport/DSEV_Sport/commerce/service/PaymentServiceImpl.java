@@ -30,12 +30,15 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     public PaymentResponse createVNPayPayment(PaymentRequest request, HttpServletRequest httpServletRequest) {
-        //VNPay params
         Map<String, String> vnp_Params = new HashMap<>();
         vnp_Params.put("vnp_Version", vnpayConfig.getVersion());
         vnp_Params.put("vnp_Command", vnpayConfig.getCommand());
         vnp_Params.put("vnp_TmnCode", vnpayConfig.getTmnCode());
-        vnp_Params.put("vnp_Amount", String.valueOf((long)(request.getAmount() * 100)));
+        if (request.getAmount() != null) {
+            BigDecimal amt = BigDecimal.valueOf(request.getAmount());
+            long amountInMinor = amt.multiply(BigDecimal.valueOf(100)).longValue();
+            vnp_Params.put("vnp_Amount", String.valueOf(amountInMinor));
+        }
         vnp_Params.put("vnp_CurrCode", "VND");
         vnp_Params.put("vnp_TxnRef", request.getOrderId());
         vnp_Params.put("vnp_OrderInfo", "Thanh toan don hang: " + request.getOrderId());
@@ -43,29 +46,34 @@ public class PaymentServiceImpl implements PaymentService {
         vnp_Params.put("vnp_Locale", "vn");
         vnp_Params.put("vnp_ReturnUrl", vnpayConfig.getReturnUrl());
         vnp_Params.put("vnp_IpAddr", VNPayUtil.getIpAddress(httpServletRequest));
-        vnp_Params.put("vnp_CreateDate", new java.text.SimpleDateFormat("yyyyMMddHHmmss").format(new Date()));
+        vnp_Params.put("vnp_CreateDate", new java.text.SimpleDateFormat("yyyyMMddHHmmss").format(new java.util.Date()));
         if (request.getBankCode() != null && !request.getBankCode().isEmpty()) {
             vnp_Params.put("vnp_BankCode", request.getBankCode());
         }
-        // Sort params
+
         List<String> fieldNames = new ArrayList<>(vnp_Params.keySet());
         Collections.sort(fieldNames);
-        StringBuilder hashData = new StringBuilder();
-        StringBuilder query = new StringBuilder();
+
+        StringJoiner hashJoiner = new StringJoiner("&");
+        StringJoiner queryJoiner = new StringJoiner("&");
         for (String fieldName : fieldNames) {
             String value = vnp_Params.get(fieldName);
-            if ((value != null) && (value.length() > 0)) {
-                hashData.append(fieldName).append('=').append(value);
-                query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII)).append('=')
-                        .append(URLEncoder.encode(value, StandardCharsets.US_ASCII));
-                if (!fieldName.equals(fieldNames.get(fieldNames.size() - 1))) {
-                    hashData.append('&');
-                    query.append('&');
-                }
+            if (value != null && value.length() > 0) {
+                hashJoiner.add(fieldName + "=" + value); // raw for signing
+                queryJoiner.add(URLEncoder.encode(fieldName, StandardCharsets.UTF_8)
+                        + "=" + URLEncoder.encode(value, StandardCharsets.UTF_8)); // encoded for URL
             }
         }
-        String secureHash = VNPayUtil.hmacSHA512(vnpayConfig.getHashSecret(), hashData.toString());
-        query.append("&vnp_SecureHash=").append(secureHash);
+
+        String hashData = hashJoiner.toString();
+        String query = queryJoiner.toString();
+
+        String secureHash = VNPayUtil.hmacSHA512(vnpayConfig.getHashSecret(), hashData);
+
+        // append secureHashType and secureHash
+        query += "&vnp_SecureHashType=" + URLEncoder.encode("SHA512", StandardCharsets.UTF_8)
+                + "&vnp_SecureHash=" + secureHash;
+
         String paymentUrl = vnpayConfig.getUrl() + "?" + query;
 
         return PaymentResponse.builder()
@@ -75,6 +83,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .build();
     }
 
+
     @Override
     public void handleVNPayReturn(HttpServletRequest request) {
         String orderNumber = request.getParameter("vnp_TxnRef");
@@ -82,7 +91,11 @@ public class PaymentServiceImpl implements PaymentService {
         String transactionId = request.getParameter("vnp_TransactionNo");
         String bankCode = request.getParameter("vnp_BankCode");
         String amountStr = request.getParameter("vnp_Amount");
-        Double amount = amountStr != null ? Double.valueOf(amountStr) / 100 : null;
+
+        java.math.BigDecimal amount = null;
+        if (amountStr != null && !amountStr.isEmpty()) {
+            amount = new java.math.BigDecimal(amountStr).divide(new java.math.BigDecimal(100));
+        }
 
         Optional<Order> orderOpt = orderRepository.findByOrderNumber(orderNumber);
         if (orderOpt.isPresent()) {
@@ -94,11 +107,10 @@ public class PaymentServiceImpl implements PaymentService {
             }
             orderRepository.save(order);
 
-            // Save payment record
             Payment payment = Payment.builder()
                     .order(order)
                     .transactionId(transactionId)
-                    .amount(amount != null ? BigDecimal.valueOf(amount) : null)
+                    .amount(amount)
                     .bankCode(bankCode)
                     .status("00".equals(responseCode) ? PaymentStatus.SUCCESS : PaymentStatus.FAILED)
                     .paymentMethod("VNPAY")
