@@ -59,7 +59,7 @@ public class PaymentServiceImpl implements PaymentService {
         vnp_Params.put("vnp_ReturnUrl", vnpayConfig.getReturnUrl());
         vnp_Params.put("vnp_IpAddr", VNPayUtil.getIpAddress(httpServletRequest));
 
-        Calendar cld = Calendar.getInstance(); // server TZ = Asia/Ho_Chi_Minh
+        Calendar cld = Calendar.getInstance();
         SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
         String vnp_CreateDate = formatter.format(cld.getTime());
         vnp_Params.put("vnp_CreateDate", vnp_CreateDate);
@@ -79,11 +79,14 @@ public class PaymentServiceImpl implements PaymentService {
             String fieldValue = vnp_Params.get(fieldName);
             if (fieldValue != null && !fieldValue.isEmpty()) {
                 try {
-                    String encodedValue = URLEncoder.encode(fieldValue, StandardCharsets.UTF_8.name());
-                    hashData.append(fieldName).append('=').append(encodedValue);
-                    query.append(URLEncoder.encode(fieldName, StandardCharsets.UTF_8.name()))
+                    // IMPORTANT: hashData must be raw "key=value" WITHOUT URL-encoding
+                    hashData.append(fieldName).append('=').append(fieldValue);
+
+                    // query string for URL: encode values (names may be left raw or encoded; encoding values is required)
+                    query.append(fieldName)
                             .append('=')
-                            .append(encodedValue);
+                            .append(URLEncoder.encode(fieldValue, StandardCharsets.UTF_8.name()));
+
                     if (itr.hasNext()) {
                         query.append('&');
                         hashData.append('&');
@@ -101,7 +104,6 @@ public class PaymentServiceImpl implements PaymentService {
         if (request.getOrderId() != null) {
             orderRepository.findById(request.getOrderId())
                     .ifPresentOrElse(order -> {
-                        // compute amount first
                         BigDecimal computedAmount = BigDecimal.ZERO;
                         String amtStr = vnp_Params.get("vnp_Amount");
                         if (amtStr != null && !amtStr.isEmpty()) {
@@ -111,10 +113,8 @@ public class PaymentServiceImpl implements PaymentService {
                                 log.warn("Cannot parse vnp_Amount={}, default 0", amtStr, ex);
                             }
                         }
-                        // make it final for lambda capture
                         final BigDecimal amountDecimal = computedAmount;
 
-                        // nếu đã có payment theo txnRef thì không tạo lại
                         paymentRepository.findByTransactionId(txnRef).ifPresentOrElse(
                                 existing -> log.debug("Payment already exists for txnRef={}", txnRef),
                                 () -> {
@@ -130,9 +130,7 @@ public class PaymentServiceImpl implements PaymentService {
                                     paymentRepository.save(prePayment);
                                 }
                         );
-                    }, () -> {
-                        log.warn("Order not found for orderNumber={}, skip pre-create payment", request.getOrderId());
-                    });
+                    }, () -> log.warn("Order not found for orderNumber={}, skip pre-create payment", request.getOrderId()));
         } else {
             log.warn("request.orderId is null, skip pre-create payment");
         }
@@ -148,17 +146,16 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional
     public void handleVNPayReturn(HttpServletRequest request) {
-        // 1) Verify secure hash from VNPay
         if (!verifyReturnSignature(request)) {
             log.warn("VNPay return signature invalid");
             return;
         }
 
-        // 2) Read fields from return
         final String txnRef = request.getParameter("vnp_TxnRef");
         final String responseCode = request.getParameter("vnp_ResponseCode");
         final String transactionStatus = request.getParameter("vnp_TransactionStatus");
         String amountStr = request.getParameter("vnp_Amount");
+        final String bankCode = request.getParameter("vnp_BankCode");
 
         BigDecimal finalAmount = null;
         if (amountStr != null && !amountStr.isEmpty()) {
@@ -169,13 +166,11 @@ public class PaymentServiceImpl implements PaymentService {
             }
         }
 
-        // 3) Update payment + order atomically
         final BigDecimal amountForUpdate = finalAmount;
 
         paymentRepository.findByTransactionId(txnRef).ifPresentOrElse(payment -> {
             boolean success = isSuccess(responseCode, transactionStatus);
 
-            // idempotent: only change when needed
             if (success && payment.getStatus() != PaymentStatus.SUCCESS) {
                 payment.setStatus(PaymentStatus.SUCCESS);
                 if (payment.getOrder() != null) {
@@ -194,11 +189,51 @@ public class PaymentServiceImpl implements PaymentService {
             if (amountForUpdate != null) {
                 payment.setAmount(amountForUpdate);
             }
+
+            // save bank code from VNPay return
+            if (bankCode != null && !bankCode.isEmpty()) {
+                payment.setBankCode(bankCode);
+            }
+
             paymentRepository.save(payment);
 
             log.info("VNPay return processed: txnRef={}, responseCode={}, transStatus={}, status={}",
                     txnRef, responseCode, transactionStatus, payment.getStatus());
         }, () -> log.warn("Payment not found for txnRef={}, cannot update status", txnRef));
+    }
+
+    private boolean verifyReturnSignature(HttpServletRequest request) {
+        String secureHash = request.getParameter("vnp_SecureHash");
+        if (secureHash == null) return false;
+
+        Map<String, String[]> raw = request.getParameterMap();
+        List<String> fieldNames = new ArrayList<>();
+        Map<String, String> data = new HashMap<>();
+
+        for (Map.Entry<String, String[]> e : raw.entrySet()) {
+            String k = e.getKey();
+            if ("vnp_SecureHash".equals(k) || "vnp_SecureHashType".equals(k)) continue;
+            String[] vals = e.getValue();
+            if (vals != null && vals.length > 0 && vals[0] != null && !vals[0].isEmpty()) {
+                fieldNames.add(k);
+                data.put(k, vals[0]);
+            }
+        }
+
+        Collections.sort(fieldNames);
+
+        StringBuilder hashData = new StringBuilder();
+        Iterator<String> it = fieldNames.iterator();
+        while (it.hasNext()) {
+            String name = it.next();
+            String val = data.get(name);
+            // IMPORTANT: do NOT URL-encode here; use raw key=value
+            hashData.append(name).append('=').append(val);
+            if (it.hasNext()) hashData.append('&');
+        }
+
+        String calc = VNPayUtil.hmacSHA512(vnpayConfig.getHashSecret(), hashData.toString());
+        return calc.equalsIgnoreCase(secureHash);
     }
 
     private boolean isSuccess(String vnpResponseCode, String vnpTransactionStatus) {
@@ -235,42 +270,4 @@ public class PaymentServiceImpl implements PaymentService {
                         .build());
     }
 
-    private boolean verifyReturnSignature(HttpServletRequest request) {
-        String secureHash = request.getParameter("vnp_SecureHash");
-        if (secureHash == null) return false;
-
-        Map<String, String[]> raw = request.getParameterMap();
-        List<String> fieldNames = new ArrayList<>();
-        Map<String, String> data = new HashMap<>();
-
-        for (Map.Entry<String, String[]> e : raw.entrySet()) {
-            String k = e.getKey();
-            if ("vnp_SecureHash".equals(k) || "vnp_SecureHashType".equals(k)) continue;
-            String[] vals = e.getValue();
-            if (vals != null && vals.length > 0 && vals[0] != null && !vals[0].isEmpty()) {
-                fieldNames.add(k);
-                data.put(k, vals[0]);
-            }
-        }
-
-        Collections.sort(fieldNames);
-
-        StringBuilder hashData = new StringBuilder();
-        Iterator<String> it = fieldNames.iterator();
-        while (it.hasNext()) {
-            String name = it.next();
-            String val = data.get(name);
-            try {
-                String encVal = URLEncoder.encode(val, StandardCharsets.UTF_8.name());
-                hashData.append(name).append('=').append(encVal);
-                if (it.hasNext()) hashData.append('&');
-            } catch (Exception ex) {
-                log.warn("Encoding error during signature verification", ex);
-                return false;
-            }
-        }
-
-        String calc = VNPayUtil.hmacSHA512(vnpayConfig.getHashSecret(), hashData.toString());
-        return calc.equalsIgnoreCase(secureHash);
-    }
 }
