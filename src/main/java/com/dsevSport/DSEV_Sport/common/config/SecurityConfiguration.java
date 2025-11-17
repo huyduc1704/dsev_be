@@ -11,11 +11,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import java.util.Arrays;
-import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -30,17 +26,26 @@ public class SecurityConfiguration {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/auth/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                        .requestMatchers("/api/v1/products/**", "/api/v1/categories/**").permitAll()
+                        .requestMatchers(
+                                "/api/v1/auth/**",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
+                        // allow all VNPay return endpoints
+                        .requestMatchers(
+                                "/api/v1/vnpay/**",
+                                "/api/v1/payment/vnpay/**",
+                                "/api/v1/payments/vnpay/**"
+                        ).permitAll()
+                        .requestMatchers("/api/v1/products/**", "/api/v1/categories/").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/payment/vnpay/callback").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/payment/vnpay/callback").permitAll()
                         .requestMatchers("/api/v1/users/profile").authenticated()
                         .requestMatchers("/api/v1/addresses/**").authenticated()
                         .anyRequest().authenticated()
                 )
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
@@ -48,6 +53,5 @@ public class SecurityConfiguration {
 
     @Configuration
     @EnableMethodSecurity
-    public class MethodSecurityConfig {
-    }
+    public class MethodSecurityConfig { }
 }

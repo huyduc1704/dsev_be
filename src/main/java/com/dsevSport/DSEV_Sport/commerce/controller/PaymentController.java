@@ -40,10 +40,10 @@ public class PaymentController {
         paymentService.handleVNPayReturn(request);
         return ResponseEntity.noContent().build();
     }
-
     @PermitAll
     @GetMapping(value = "/vnpay/return-app", produces = "text/html; charset=UTF-8")
     public String vnpayReturnApp(HttpServletRequest request) {
+        paymentService.handleVNPayReturn(request);
         StringBuilder html = new StringBuilder();
         html.append("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>VNPay Redirect</title></head><body>");
         html.append("<script>");
