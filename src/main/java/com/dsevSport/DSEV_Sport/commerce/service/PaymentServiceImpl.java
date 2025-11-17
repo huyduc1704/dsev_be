@@ -206,34 +206,35 @@ public class PaymentServiceImpl implements PaymentService {
         String secureHash = request.getParameter("vnp_SecureHash");
         if (secureHash == null) return false;
 
-        Map<String, String[]> raw = request.getParameterMap();
-        List<String> fieldNames = new ArrayList<>();
-        Map<String, String> data = new HashMap<>();
+        String query = request.getQueryString(); // RAW FULL QUERY
+        if (query == null) return false;
 
-        for (Map.Entry<String, String[]> e : raw.entrySet()) {
-            String k = e.getKey();
-            if ("vnp_SecureHash".equals(k) || "vnp_SecureHashType".equals(k)) continue;
-            String[] vals = e.getValue();
-            if (vals != null && vals.length > 0 && vals[0] != null && !vals[0].isEmpty()) {
-                fieldNames.add(k);
-                data.put(k, vals[0]);
-            }
+        // Split raw query into key=value parts and exclude secure hash fields
+        List<String> params = new ArrayList<>();
+        for (String part : query.split("&")) {
+            if (part.startsWith("vnp_SecureHash")) continue;
+            if (part.startsWith("vnp_SecureHashType")) continue;
+            params.add(part);
         }
 
-        Collections.sort(fieldNames);
+        // Sort by alphabet (key order) to match VNPay's signing process
+        Collections.sort(params);
 
+        // Build raw hashData (do NOT URL-decode or re-encode)
         StringBuilder hashData = new StringBuilder();
-        Iterator<String> it = fieldNames.iterator();
-        while (it.hasNext()) {
-            String name = it.next();
-            String val = data.get(name);
-            // IMPORTANT: do NOT URL-encode here; use raw key=value
-            hashData.append(name).append('=').append(val);
-            if (it.hasNext()) hashData.append('&');
+        for (int i = 0; i < params.size(); i++) {
+            hashData.append(params.get(i));
+            if (i < params.size() - 1) hashData.append("&");
         }
 
         String calc = VNPayUtil.hmacSHA512(vnpayConfig.getHashSecret(), hashData.toString());
-        return calc.equalsIgnoreCase(secureHash);
+
+        log.info("RAW QUERY = {}", query);
+        log.info("RAW HASH DATA = {}", hashData);
+        log.info("OUR CALC = {}", calc);
+        log.info("VNPAY SECUREHASH = {}", secureHash);
+
+        return secureHash.equalsIgnoreCase(calc);
     }
 
     private boolean isSuccess(String vnpResponseCode, String vnpTransactionStatus) {
