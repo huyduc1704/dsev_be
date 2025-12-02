@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.FieldDefaults;
 
-import java.util.List;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Data
@@ -14,13 +14,8 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 @FieldDefaults(level = lombok.AccessLevel.PRIVATE)
-public class ProductResponse {
+public class ProductImageResponse {
     UUID id;
-    String name;
-    String description;
-    String brand;
-    List<String> images;
-    Boolean isActive;
-    UUID categoryId;
-    List<ProductVariantResponse> variants;
+    String imageUrl;
+    LocalDateTime createdAt;
 }

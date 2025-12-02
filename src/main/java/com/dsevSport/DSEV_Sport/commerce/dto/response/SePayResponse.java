@@ -1,8 +1,9 @@
-package com.dsevSport.DSEV_Sport.commerce.dto.request;
+package com.dsevSport.DSEV_Sport.commerce.dto.response;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Data
@@ -10,8 +11,8 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class OrderRequest {
-    UUID addressId;
-    String note;
+public class SePayResponse {
+    UUID orderId;
+    BigDecimal amount;
+    String qrUrl;
 }
-

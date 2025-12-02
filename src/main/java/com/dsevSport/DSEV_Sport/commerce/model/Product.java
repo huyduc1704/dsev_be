@@ -30,9 +30,6 @@ public class Product {
     String description;
     String brand;
 
-    @Column(name = "image_url")
-    String imageUrl;
-
     @Column(name = "is_active")
     Boolean isActive;
 
@@ -44,4 +41,7 @@ public class Product {
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProductVariant> variants = new ArrayList<>();
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    List<ProductImage> images = new ArrayList<>();
 }

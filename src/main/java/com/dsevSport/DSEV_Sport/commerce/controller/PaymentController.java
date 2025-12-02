@@ -1,9 +1,19 @@
 package com.dsevSport.DSEV_Sport.commerce.controller;
 
 import com.dsevSport.DSEV_Sport.commerce.dto.request.PaymentRequest;
+import com.dsevSport.DSEV_Sport.commerce.dto.request.SePayRequest;
 import com.dsevSport.DSEV_Sport.commerce.dto.response.ApiResponse;
 import com.dsevSport.DSEV_Sport.commerce.dto.response.PaymentResponse;
+import com.dsevSport.DSEV_Sport.commerce.dto.response.SePayResponse;
+import com.dsevSport.DSEV_Sport.commerce.model.Order;
+import com.dsevSport.DSEV_Sport.commerce.model.Payment;
+import com.dsevSport.DSEV_Sport.commerce.repository.OrderRepository;
+import com.dsevSport.DSEV_Sport.commerce.repository.PaymentRepository;
 import com.dsevSport.DSEV_Sport.commerce.service.PaymentService;
+import com.dsevSport.DSEV_Sport.common.config.SePayConfig;
+import com.dsevSport.DSEV_Sport.common.util.SePayQrBuilder;
+import com.dsevSport.DSEV_Sport.common.util.enums.OrderStatus;
+import com.dsevSport.DSEV_Sport.common.util.enums.PaymentStatus;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.security.PermitAll;
 import jakarta.servlet.http.HttpServletRequest;
@@ -12,6 +22,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Tag(name = "Payments", description = "Payment processing endpoints")
@@ -21,6 +32,9 @@ import java.util.UUID;
 public class PaymentController {
 
     private final PaymentService paymentService;
+    private final OrderRepository orderRepository;
+    private final PaymentRepository paymentRepository;
+    private final SePayConfig config;
 
     @PostMapping("/payments/vnpay")
     public ResponseEntity<ApiResponse<PaymentResponse>> createVNPayPayment(
@@ -79,4 +93,57 @@ public class PaymentController {
                         .build()
         );
     }
+
+    @PostMapping("/sepay")
+    public ResponseEntity<ApiResponse<SePayResponse>> createSePayQR(@RequestBody SePayRequest request) {
+
+        Order order = orderRepository.findById(request.getOrderId())
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new RuntimeException("Order already paid/canceled");
+        }
+        if (paymentRepository.existsByOrderId(order.getId())) {
+            throw new RuntimeException("Payment already exists");
+        }
+
+        //generate transactionId
+        String transactionId = "SEPAY_" + System.currentTimeMillis();
+
+        //build QR content
+        String content = order.getOrderNumber() + "|" + transactionId;
+
+        //generate QR URL
+        String qrUrl = SePayQrBuilder.buildQR(
+                config.getBank(),
+                config.getAccount(),
+                order.getTotalPrice(),
+                content
+        );
+
+        //Create payment pending
+        Payment payment = new Payment();
+        payment.setOrder(order);
+        payment.setAmount(order.getTotalPrice());
+        payment.setTransactionId(transactionId);
+        payment.setStatus(PaymentStatus.PENDING);
+        payment.setPaymentMethod("SEPAY");
+        payment.setCreatedAt(LocalDateTime.now());
+        paymentRepository.save(payment);
+
+        SePayResponse response = SePayResponse.builder()
+                .orderId(order.getId())
+                .amount(order.getTotalPrice())
+                .qrUrl(qrUrl)
+                .build();
+
+        return ResponseEntity.ok(
+                ApiResponse.<SePayResponse>builder()
+                        .message("Created payment successfully")
+                        .code(200)
+                        .data(response)
+                        .build()
+        );
+    }
+
 }

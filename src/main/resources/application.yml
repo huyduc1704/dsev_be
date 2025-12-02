@@ -58,3 +58,11 @@ vnpay:
   version: 2.1.0
   command: pay
   order-type: other
+
+sepay:
+  webhook-api-key: ${SEPAY_API_KEY}
+  bank: ${SEPAY_BANK}
+  account: ${SEPAY_ACCOUNT}
+
+gcs:
+  bucket: ${GCS_BUCKET}

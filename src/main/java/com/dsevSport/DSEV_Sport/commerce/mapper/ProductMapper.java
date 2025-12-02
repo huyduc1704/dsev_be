@@ -4,7 +4,10 @@ import com.dsevSport.DSEV_Sport.commerce.dto.request.ProductRequest;
 import com.dsevSport.DSEV_Sport.commerce.dto.response.ProductResponse;
 import com.dsevSport.DSEV_Sport.commerce.model.Category;
 import com.dsevSport.DSEV_Sport.commerce.model.Product;
+import com.dsevSport.DSEV_Sport.commerce.model.ProductImage;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 @Component
 public class ProductMapper implements CrudMapper<Product, ProductResponse, ProductRequest, ProductRequest> {
@@ -15,9 +18,15 @@ public class ProductMapper implements CrudMapper<Product, ProductResponse, Produ
                 .name(entity.getName())
                 .description(entity.getDescription())
                 .brand(entity.getBrand())
-                .imageUrl(entity.getImageUrl())
                 .isActive(entity.getIsActive())
                 .categoryId(entity.getCategory() != null ? entity.getCategory().getId() : null)
+                .images(
+                        entity.getImages() != null
+                        ? entity.getImages().stream()
+                                .map(ProductImage::getImageUrl)
+                                .toList()
+                                : List.of()
+                )
                 .build();
     }
 
@@ -27,7 +36,6 @@ public class ProductMapper implements CrudMapper<Product, ProductResponse, Produ
                 .name(request.getName())
                 .description(request.getDescription())
                 .brand(request.getBrand())
-                .imageUrl(request.getImageUrl())
                 .isActive(request.getIsActive())
                 .build();
         if (request.getCategoryId() != null) {
@@ -43,7 +51,6 @@ public class ProductMapper implements CrudMapper<Product, ProductResponse, Produ
         setIfNotNull(request.getName(), entity::setName);
         setIfNotNull(request.getDescription(), entity::setDescription);
         setIfNotNull(request.getBrand(), entity::setBrand);
-        setIfNotNull(request.getImageUrl(), entity::setImageUrl);
         setIfNotNull(request.getIsActive(), entity::setIsActive);
         if (request.getCategoryId() != null) {
             Category category = new Category();

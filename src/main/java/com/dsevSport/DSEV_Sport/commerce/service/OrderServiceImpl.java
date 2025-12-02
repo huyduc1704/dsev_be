@@ -197,7 +197,11 @@ public class OrderServiceImpl implements OrderService {
         return OrderItemResponse.builder()
                 .id(item.getId())
                 .productName(product.getName())
-                .productImage(product.getImageUrl())
+                .productImage(
+                        product.getImages().isEmpty()
+                            ? null
+                            :product.getImages().get(0).getImageUrl()
+                )
                 .color(variant.getColor())
                 .size(variant.getSize())
                 .quantity(item.getQuantity())

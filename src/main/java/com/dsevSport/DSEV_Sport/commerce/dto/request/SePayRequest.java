@@ -10,10 +10,6 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class ProductRequest {
-    String name;
-    String description;
-    String brand;
-    Boolean isActive;
-    UUID categoryId;
+public class SePayRequest {
+    UUID orderId;
 }
