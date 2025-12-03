@@ -26,12 +26,16 @@ services:
     container_name: dsev_be
     restart: always
     environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /app/gcs-key.json
+      GCS_BUCKET: dsev_image
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - /home/rsa-key-20251024/dsev-476107-9d5c478f0e23.json:/app/gcs-key.json:ro
     ports:
       - "8080:8080"
 
