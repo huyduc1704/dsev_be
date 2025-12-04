@@ -66,3 +66,9 @@ sepay:
 
 gcs:
   bucket: ${GCS_BUCKET}
+
+fal:
+  api-key: b7c6391a-c995-4e92-af94-392fcacd3e52:8debe3017dcc2539730573d4871ea934
+  cat-vton:
+    model-name: fal-ai/cat-vton
+    endpoint: https://fal.run/fal-ai/cat-vton
