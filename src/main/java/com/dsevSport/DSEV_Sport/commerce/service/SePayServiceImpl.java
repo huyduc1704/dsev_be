@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -44,7 +45,6 @@ public class SePayServiceImpl implements SePayService {
 
         log.info("📌 Webhook payload = {}", payload);
 
-        // ----- Extract flexible fields -----
         String content = safe(payload.get("content"),
                 payload.get("description"),
                 payload.get("note"));
@@ -59,26 +59,20 @@ public class SePayServiceImpl implements SePayService {
                         : payload.get("amount")
         );
 
-        if (content == null) {
-            log.warn("❌ Missing content");
+        if (content == null || amount == null) {
+            log.warn("❌ Missing content or amount");
             return;
         }
 
-        if (amount == null) {
-            log.warn("❌ Missing amount");
-            return;
-        }
-
-        // ----- Extract order number -----
+        // Extract order number
         String orderNumber = extractOrderNumber(content);
         if (orderNumber == null) {
-            log.warn("❌ Order number not found in content: {}", content);
+            log.warn("❌ Cannot find order number inside content: {}", content);
             return;
         }
 
         log.info("🔍 Extracted orderNumber = {}", orderNumber);
 
-        // ----- Find order -----
         var orderOpt = orderRepository.findByOrderNumber(orderNumber);
         if (orderOpt.isEmpty()) {
             log.warn("❌ Order {} not found", orderNumber);
@@ -86,39 +80,59 @@ public class SePayServiceImpl implements SePayService {
         }
         Order order = orderOpt.get();
 
-        // ----- Check amount tolerance -----
+        // Tolerance ±1000 VND
         BigDecimal orderPrice = order.getTotalPrice();
-        if (orderPrice == null) {
-            log.warn("❌ Order price null");
-            return;
-        }
-
         BigDecimal diff = orderPrice.subtract(amount).abs();
         if (diff.compareTo(BigDecimal.valueOf(1000)) > 0) {
-            log.warn("❌ Price mismatch. Expected {}, got {}", orderPrice, amount);
+            log.warn("❌ Price mismatch. Order={}, Received={}", orderPrice, amount);
             return;
         }
 
-        // ----- Ensure transaction id -----
+        // Ensure transaction ID
         if (transactionId == null || transactionId.isBlank()) {
             transactionId = "SEPAY_" + System.currentTimeMillis();
-            log.warn("⚠️ Missing transactionId -> Generated {}", transactionId);
+            log.warn("⚠️ Missing transactionId -> Using generated {}", transactionId);
         }
 
-        // ----- Check duplicate payment -----
+        // Prevent duplicate
         if (paymentRepository.existsByTransactionId(transactionId)) {
             log.warn("⚠️ Duplicate transaction {}", transactionId);
             return;
         }
 
-        // ----- Update order -----
-        log.info("✅ Marking order {} as COMPLETED", orderNumber);
+        // -------------------------------------
+        // 🚀 FIX LOGIC QUAN TRỌNG NHẤT
+        // -------------------------------------
 
-        order.setStatus(OrderStatus.COMPLETED);
-        order.setCompletedAt(LocalDateTime.now());
-        orderRepository.save(order);
+        Optional<Payment> existingPaymentOpt = paymentRepository.findByOrderId(order.getId());
 
-        // ----- Save Payment -----
+        if (existingPaymentOpt.isPresent()) {
+            Payment existingPayment = existingPaymentOpt.get();
+
+            log.info("🟡 Order {} already has a payment record. Updating...", orderNumber);
+
+            // Update only if not SUCCESS
+            if (existingPayment.getStatus() != PaymentStatus.SUCCESS) {
+                existingPayment.setStatus(PaymentStatus.SUCCESS);
+                existingPayment.setTransactionId(transactionId);
+                existingPayment.setAmount(amount);
+                paymentRepository.save(existingPayment);
+
+                order.setStatus(OrderStatus.COMPLETED);
+                order.setCompletedAt(LocalDateTime.now());
+                orderRepository.save(order);
+
+                log.info("🎉 Updated existing payment → SUCCESS");
+            }
+
+            return;
+        }
+
+        // -------------------------------------
+        // 🟢 If no payment exists → create
+        // -------------------------------------
+        log.info("🟢 Creating new payment for order {}", orderNumber);
+
         Payment payment = new Payment();
         payment.setOrder(order);
         payment.setAmount(amount);
@@ -126,13 +140,17 @@ public class SePayServiceImpl implements SePayService {
         payment.setPaymentMethod("SEPAY");
         payment.setStatus(PaymentStatus.SUCCESS);
         payment.setCreatedAt(LocalDateTime.now());
-
         paymentRepository.save(payment);
 
-        log.info("🎉 Order {} paid successfully with transaction {}", orderNumber, transactionId);
+        // Update order
+        order.setStatus(OrderStatus.COMPLETED);
+        order.setCompletedAt(LocalDateTime.now());
+        orderRepository.save(order);
+
+        log.info("🎉 Payment created & order {} marked as COMPLETED", orderNumber);
     }
 
-    // ---------- Helpers ----------
+    // Helpers...
     private String safe(Object... values) {
         for (Object v : values) {
             if (v != null && !String.valueOf(v).trim().isEmpty()) {
@@ -154,13 +172,10 @@ public class SePayServiceImpl implements SePayService {
     private BigDecimal parseAmount(Object obj) {
         try {
             if (obj == null) return null;
-
             if (obj instanceof Number n) return new BigDecimal(n.toString());
-
-            String s = obj.toString().replace(",", "").trim();
-            return new BigDecimal(s);
+            return new BigDecimal(obj.toString().replace(",", "").trim());
         } catch (Exception e) {
-            log.warn("❌ Cannot parse amount from {}", obj);
+            log.warn("❌ Cannot parse amount: {}", obj);
             return null;
         }
     }
