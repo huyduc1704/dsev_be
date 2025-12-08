@@ -18,7 +18,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-
 @Service
 @Slf4j
 @Transactional
@@ -28,7 +27,13 @@ public class SePayServiceImpl implements SePayService {
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
 
-    private final Pattern ORDER_PATTERN = Pattern.compile("(ORD-\\d+|ORD_[A-Za-z0-9]+)");
+    /**
+     * Regex mới hỗ trợ tất cả các dạng sau:
+     *  - ORD1765186035478
+     *  - ORD-1765186035478
+     *  - ORD_1765186035478
+     */
+    private final Pattern ORDER_PATTERN = Pattern.compile("ORD[-_]?([0-9]+)");
 
     @Override
     public void processWebhook(String rawJson) {
@@ -37,11 +42,11 @@ public class SePayServiceImpl implements SePayService {
         log.info("Parsed payload: {}", payload);
 
         String content = (String) payload.get("content");
-        String transactionId = String.valueOf(payload.get("transactionId"));
+        String transactionId = String.valueOf(payload.get("referenceCode"));   // SePay dùng referenceCode
         BigDecimal amount = new BigDecimal(payload.get("transferAmount").toString());
 
-        if (content == null || transactionId == null) {
-            log.warn("Missing content or transactionId");
+        if (content == null) {
+            log.warn("Missing content in webhook");
             return;
         }
 
@@ -52,7 +57,9 @@ public class SePayServiceImpl implements SePayService {
             return;
         }
 
-        // Find order
+        log.info("Detected orderNumber = {}", orderNumber);
+
+        // Find order by orderNumber (ví dụ: ORD1765186035478)
         Order order = orderRepository.findByOrderNumber(orderNumber)
                 .orElseThrow(() -> new RuntimeException("Order not found: " + orderNumber));
 
@@ -64,7 +71,8 @@ public class SePayServiceImpl implements SePayService {
 
         // Check amount
         if (order.getTotalPrice().compareTo(amount) != 0) {
-            log.warn("Amount mismatch for order {}: expected {}, actual {}", orderNumber, order.getTotalPrice(), amount);
+            log.warn("Amount mismatch for order {}: expected {}, actual {}",
+                    orderNumber, order.getTotalPrice(), amount);
             return;
         }
 
@@ -74,7 +82,7 @@ public class SePayServiceImpl implements SePayService {
             return;
         }
 
-        // Order already has payment?
+        // Already has payment
         if (paymentRepository.existsByOrderId(order.getId())) {
             log.warn("Order {} already linked to a payment", orderNumber);
             return;
@@ -108,7 +116,9 @@ public class SePayServiceImpl implements SePayService {
 
     private String extractOrderNumber(String content) {
         Matcher matcher = ORDER_PATTERN.matcher(content);
-        return matcher.find() ? matcher.group() : null;
+        if (matcher.find()) {
+            return "ORD" + matcher.group(1);
+        }
+        return null;
     }
 }
-
