@@ -27,113 +27,98 @@ public class SePayServiceImpl implements SePayService {
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
 
-    private final Pattern ORDER_PATTERN =
-            Pattern.compile("ORD[-_]?([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
-
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     public void processWebhook(String rawJson) {
 
-        Map<String, Object> payload = parseJsonSafe(rawJson);
-        if (payload == null) {
-            log.warn("Invalid JSON payload");
+        Map<String, Object> payload = parseJson(rawJson);
+
+        log.info("Parsed payload: {}", payload);
+
+        String content = (String) payload.get("content");
+        String transactionId = String.valueOf(payload.get("referenceCode"));
+        BigDecimal amount = new BigDecimal(payload.get("transferAmount").toString());
+
+        if (content == null || transactionId == null) {
+            log.warn("Missing content or transactionId");
             return;
         }
 
-        String content = safe(payload.get("content"));
-        if (content == null) content = safe(payload.get("description"));
-
-        String transactionId = safe(payload.get("referenceCode"));
-        if (transactionId == null) transactionId = safe(payload.get("transactionId"));
-        if (transactionId == null) transactionId = safe(payload.get("id"));
-
-        BigDecimal amount = parseAmount(payload.get("transferAmount"));
-        if (amount == null) amount = parseAmount(payload.get("amount"));
-
-        if (content == null || amount == null) {
-            log.warn("Payload missing fields: {}", payload);
-            return;
-        }
-
+        // Extract Order
         String orderNumber = extractOrderNumber(content);
+        log.info("Extracted Order Number: {}", orderNumber);
+
         if (orderNumber == null) {
-            log.warn("Order number not found in content: {}", content);
+            log.warn("Order number not found from content: {}", content);
             return;
         }
 
-        var orderOpt = orderRepository.findByOrderNumber(orderNumber);
-        if (orderOpt.isEmpty()) {
-            log.warn("Order {} not found", orderNumber);
+        // Find order
+        Order order = orderRepository.findByOrderNumber(orderNumber)
+                .orElse(null);
+
+        if (order == null) {
+            log.warn("Order {} not found in DB", orderNumber);
             return;
         }
 
-        Order order = orderOpt.get();
-
+        // Check if completed
         if (order.getStatus() == OrderStatus.COMPLETED) {
             log.warn("Order {} already completed", orderNumber);
             return;
         }
 
+        // Patch: Fix Amount Compare
         if (order.getTotalPrice().compareTo(amount) != 0) {
-            log.warn("Amount mismatch. expected {} received {}", order.getTotalPrice(), amount);
+            log.warn("Amount mismatch for order {}: expected {}, got {}",
+                    orderNumber, order.getTotalPrice(), amount);
             return;
         }
 
-        if (transactionId == null || transactionId.isBlank()) {
-            transactionId = "SEPAY_" + System.currentTimeMillis();
-        }
-
+        // Duplicate?
         if (paymentRepository.existsByTransactionId(transactionId)) {
-            log.warn("Duplicate transaction {}", transactionId);
+            log.warn("Duplicate transactionId: {}", transactionId);
             return;
         }
 
+        // Already has payment?
         if (paymentRepository.existsByOrderId(order.getId())) {
-            log.warn("Order {} already has payment", orderNumber);
+            log.warn("Order {} already has a payment entry", orderNumber);
             return;
         }
 
+        // Save order
         order.setStatus(OrderStatus.COMPLETED);
         order.setCompletedAt(LocalDateTime.now());
         orderRepository.save(order);
 
-        Payment p = new Payment();
-        p.setOrder(order);
-        p.setAmount(amount);
-        p.setPaymentMethod("SEPAY");
-        p.setTransactionId(transactionId);
-        p.setStatus(PaymentStatus.SUCCESS);
-        p.setCreatedAt(LocalDateTime.now());
-        paymentRepository.save(p);
+        // Create payment
+        Payment payment = new Payment();
+        payment.setOrder(order);
+        payment.setAmount(amount);
+        payment.setPaymentMethod("SEPAY");
+        payment.setTransactionId(transactionId);
+        payment.setStatus(PaymentStatus.SUCCESS);
+        payment.setCreatedAt(LocalDateTime.now());
+        paymentRepository.save(payment);
 
-        log.info("Order {} marked as PAID, transaction {}", orderNumber, transactionId);
+        log.info("Order {} marked as COMPLETED", orderNumber);
     }
 
-    private Map<String, Object> parseJsonSafe(String json) {
+    private Map<String, Object> parseJson(String json) {
         try {
             return objectMapper.readValue(json, Map.class);
         } catch (Exception e) {
-            return null;
+            throw new RuntimeException("Invalid JSON payload", e);
         }
     }
 
-    private String safe(Object o) {
-        return o == null ? null : o.toString().trim();
-    }
-
-    private BigDecimal parseAmount(Object o) {
-        try {
-            if (o == null) return null;
-            return new BigDecimal(o.toString().replaceAll("[^0-9]", ""));
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
+    // THE FIX: ONLY MATCH ORD + digits
     private String extractOrderNumber(String content) {
-        Matcher m = ORDER_PATTERN.matcher(content);
-        if (!m.find()) return null;
-        return "ORD" + m.group(1);
+        Pattern p = Pattern.compile("(ORD\\d+)");
+        Matcher m = p.matcher(content);
+        return m.find() ? m.group(1) : null;
     }
 }
+
