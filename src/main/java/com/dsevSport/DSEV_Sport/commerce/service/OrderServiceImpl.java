@@ -68,7 +68,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // 5. Create order
-        String orderNumber = "ORD-" + System.currentTimeMillis();
+        String orderNumber = "ORD" + System.currentTimeMillis();
         Order order = new Order();
         order.setUser(user);
         order.setAddress(address);
