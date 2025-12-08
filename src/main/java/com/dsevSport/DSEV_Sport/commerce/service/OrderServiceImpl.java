@@ -9,6 +9,7 @@ import com.dsevSport.DSEV_Sport.common.util.enums.OrderStatus;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
 @Transactional
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+@Slf4j
 public class OrderServiceImpl implements OrderService {
 
     OrderRepository orderRepo;
@@ -33,32 +35,34 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public OrderResponse createOrderFromCart(String username, OrderRequest request) {
-
+        // 1. Get user
         User user = userRepo.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        // 2. Address check
         Address address = addressRepo.findById(request.getAddressId())
                 .orElseThrow(() -> new RuntimeException("Address not found"));
-
         if (!address.getUser().getId().equals(user.getId())) {
             throw new RuntimeException("Address does not belong to user");
         }
 
+        // 3. Cart
         Cart cart = cartRepo.findByUser_Id(user.getId());
-        if (cart == null || cart.getItems().isEmpty()) {
+        if (cart == null || cart.getItems() == null || cart.getItems().isEmpty()) {
             throw new RuntimeException("Cart is empty");
         }
 
+        // 4. Lock stock & compute total
         BigDecimal totalPrice = BigDecimal.ZERO;
-
-        // LOCK STOCK
         for (CartItem c : cart.getItems()) {
             ProductVariant variant = c.getProductVariant();
-
+            if (variant == null) {
+                throw new RuntimeException("Product variant not found for cart item");
+            }
             if (variant.getStockQuantity() < c.getQuantity()) {
                 throw new RuntimeException("Insufficient stock for variant: " + variant.getId());
             }
-
+            // decrement stock
             variant.setStockQuantity(variant.getStockQuantity() - c.getQuantity());
             variantRepo.save(variant);
 
@@ -67,6 +71,7 @@ public class OrderServiceImpl implements OrderService {
             );
         }
 
+        // 5. Create order
         Order order = new Order();
         order.setUser(user);
         order.setAddress(address);
@@ -78,6 +83,7 @@ public class OrderServiceImpl implements OrderService {
         order.setUpdatedAt(LocalDateTime.now());
         orderRepo.save(order);
 
+        // 6. Create order items
         List<OrderItemResponse> itemResponses = cart.getItems().stream()
                 .map(c -> {
                     OrderItem item = new OrderItem();
@@ -89,11 +95,14 @@ public class OrderServiceImpl implements OrderService {
                     item.setCreatedAt(LocalDateTime.now());
                     orderItemRepo.save(item);
                     return toOrderItemResponse(item);
-                }).toList();
+                })
+                .collect(Collectors.toList());
 
+        // 7. Clear cart
         cart.getItems().clear();
         cartRepo.save(cart);
 
+        log.info("Order created: {}, user={}, total={}", order.getOrderNumber(), user.getId(), totalPrice);
         return toOrderResponse(order, address, itemResponses);
     }
 
@@ -105,11 +114,10 @@ public class OrderServiceImpl implements OrderService {
                     List<OrderItemResponse> items = orderItemRepo.findByOrder_Id(order.getId())
                             .stream()
                             .map(this::toOrderItemResponse)
-                            .toList();
-
+                            .collect(Collectors.toList());
                     return toOrderResponse(order, order.getAddress(), items);
                 })
-                .toList();
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -119,24 +127,22 @@ public class OrderServiceImpl implements OrderService {
 
         order.setStatus(status);
         order.setUpdatedAt(LocalDateTime.now());
-
         if (status == OrderStatus.COMPLETED) {
             order.setCompletedAt(LocalDateTime.now());
         }
-
         orderRepo.save(order);
 
         List<OrderItemResponse> items = orderItemRepo.findByOrder_Id(orderId)
                 .stream()
                 .map(this::toOrderItemResponse)
-                .toList();
+                .collect(Collectors.toList());
 
+        log.info("Order {} status updated to {}", order.getOrderNumber(), status);
         return toOrderResponse(order, order.getAddress(), items);
     }
 
     @Override
     public void cancelOrder(String username, UUID orderId) {
-
         User user = userRepo.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -152,16 +158,19 @@ public class OrderServiceImpl implements OrderService {
         }
 
         List<OrderItem> items = orderItemRepo.findByOrder_Id(orderId);
-
         for (OrderItem i : items) {
             ProductVariant v = i.getProductVariant();
-            v.setStockQuantity(v.getStockQuantity() + i.getQuantity());
-            variantRepo.save(v);
+            if (v != null) {
+                v.setStockQuantity(v.getStockQuantity() + i.getQuantity());
+                variantRepo.save(v);
+            }
         }
 
         order.setStatus(OrderStatus.CANCELED);
         order.setUpdatedAt(LocalDateTime.now());
         orderRepo.save(order);
+
+        log.info("Order {} canceled by user {}", order.getOrderNumber(), username);
     }
 
     private OrderResponse toOrderResponse(Order order, Address address, List<OrderItemResponse> items) {
@@ -174,29 +183,27 @@ public class OrderServiceImpl implements OrderService {
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())
                 .completedAt(order.getCompletedAt())
-                .fullName(address.getFullName())
-                .phoneNumber(address.getPhoneNumber())
-                .city(address.getCity())
-                .ward(address.getWard())
-                .street(address.getStreet())
+                .fullName(address != null ? address.getFullName() : null)
+                .phoneNumber(address != null ? address.getPhoneNumber() : null)
+                .city(address != null ? address.getCity() : null)
+                .ward(address != null ? address.getWard() : null)
+                .street(address != null ? address.getStreet() : null)
                 .items(items)
                 .build();
     }
 
     private OrderItemResponse toOrderItemResponse(OrderItem item) {
         ProductVariant variant = item.getProductVariant();
-        Product product = variant.getProduct();
+        Product product = variant != null ? variant.getProduct() : null;
 
         return OrderItemResponse.builder()
                 .id(item.getId())
-                .productName(product.getName())
-                .productImage(
-                        product.getImages() != null && !product.getImages().isEmpty()
-                                ? product.getImages().get(0).getImageUrl()
-                                : null
-                )
-                .color(variant.getColor())
-                .size(variant.getSize())
+                .productName(product != null ? product.getName() : null)
+                .productImage((product != null && product.getImages() != null && !product.getImages().isEmpty())
+                        ? product.getImages().get(0).getImageUrl()
+                        : null)
+                .color(variant != null ? variant.getColor() : null)
+                .size(variant != null ? variant.getSize() : null)
                 .quantity(item.getQuantity())
                 .unitPrice(item.getUnitPrice())
                 .subtotalPrice(item.getSubtotalPrice())
