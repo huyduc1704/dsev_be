@@ -29,141 +29,145 @@ public class SePayServiceImpl implements SePayService {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // match ORD followed by digits (e.g. ORD1765...)
-    private static final Pattern ORDER_PATTERN = Pattern.compile("ORD\\d+", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ORDER_PATTERN =
+            Pattern.compile("(ORD[-_]?\\d+)", Pattern.CASE_INSENSITIVE);
 
-    /**
-     * Use REQUIRES_NEW so webhook processing commits independently.
-     * This prevents the webhook transaction from being rolled back if caller transaction exists.
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @Override
+    @Transactional
     public void processWebhook(String rawJson) {
+
         Map<String, Object> payload = parseJsonSafe(rawJson);
         if (payload == null) {
-            log.warn("Webhook payload invalid JSON, ignoring");
+            log.warn("❌ Invalid JSON");
             return;
         }
-        log.info("Parsed payload: {}", payload);
 
-        // flexible field extraction
-        String content = safeString(payload.get("content"));
-        if (content == null) content = safeString(payload.get("description"));
-        if (content == null) content = safeString(payload.get("note"));
+        log.info("📌 Webhook payload = {}", payload);
 
-        String transactionId = safeString(payload.get("referenceCode"));
-        if (transactionId == null) transactionId = safeString(payload.get("id"));
-        if (transactionId == null) transactionId = safeString(payload.get("transactionId"));
+        // ----- Extract flexible fields -----
+        String content = safe(payload.get("content"),
+                payload.get("description"),
+                payload.get("note"));
 
-        BigDecimal amount = parseAmount(payload.get("transferAmount"));
-        if (amount == null) amount = parseAmount(payload.get("amount"));
+        String transactionId = safe(payload.get("referenceCode"),
+                payload.get("id"),
+                payload.get("transactionId"));
+
+        BigDecimal amount = parseAmount(
+                payload.get("transferAmount") != null
+                        ? payload.get("transferAmount")
+                        : payload.get("amount")
+        );
 
         if (content == null) {
-            log.warn("Webhook missing content/description; payload={}", payload);
-            return;
-        }
-        if (amount == null) {
-            log.warn("Webhook missing amount; payload={}", payload);
+            log.warn("❌ Missing content");
             return;
         }
 
-        // extract order number
+        if (amount == null) {
+            log.warn("❌ Missing amount");
+            return;
+        }
+
+        // ----- Extract order number -----
         String orderNumber = extractOrderNumber(content);
         if (orderNumber == null) {
-            log.warn("Order number not found in content: {}", content);
+            log.warn("❌ Order number not found in content: {}", content);
             return;
         }
-        log.info("Detected orderNumber = {}", orderNumber);
 
-        // lookup order
+        log.info("🔍 Extracted orderNumber = {}", orderNumber);
+
+        // ----- Find order -----
         var orderOpt = orderRepository.findByOrderNumber(orderNumber);
         if (orderOpt.isEmpty()) {
-            log.warn("Order not found for orderNumber={} — payload ignored", orderNumber);
+            log.warn("❌ Order {} not found", orderNumber);
             return;
         }
         Order order = orderOpt.get();
 
-        // already completed?
-        if (order.getStatus() == OrderStatus.COMPLETED) {
-            log.warn("Order {} already completed", orderNumber);
+        // ----- Check amount tolerance -----
+        BigDecimal orderPrice = order.getTotalPrice();
+        if (orderPrice == null) {
+            log.warn("❌ Order price null");
             return;
         }
 
-        // price check
-        if (order.getTotalPrice() == null) {
-            log.warn("Order {} totalPrice null — ignoring", orderNumber);
-            return;
-        }
-        if (order.getTotalPrice().compareTo(amount) != 0) {
-            log.warn("Amount mismatch. Expected: {}, received {} — ignoring", order.getTotalPrice(), amount);
+        BigDecimal diff = orderPrice.subtract(amount).abs();
+        if (diff.compareTo(BigDecimal.valueOf(1000)) > 0) {
+            log.warn("❌ Price mismatch. Expected {}, got {}", orderPrice, amount);
             return;
         }
 
-        // ensure transaction id
+        // ----- Ensure transaction id -----
         if (transactionId == null || transactionId.isBlank()) {
-            transactionId = "SEPAY_AUTO_" + System.currentTimeMillis();
-            log.warn("TransactionId missing, generated {}", transactionId);
+            transactionId = "SEPAY_" + System.currentTimeMillis();
+            log.warn("⚠️ Missing transactionId -> Generated {}", transactionId);
         }
 
-        // duplicate checks
+        // ----- Check duplicate payment -----
         if (paymentRepository.existsByTransactionId(transactionId)) {
-            log.warn("Duplicate transaction: {}", transactionId);
-            return;
-        }
-        if (paymentRepository.existsByOrderId(order.getId())) {
-            log.warn("Order {} already has payment", orderNumber);
+            log.warn("⚠️ Duplicate transaction {}", transactionId);
             return;
         }
 
-        // mark order completed and create payment (within this new transaction)
+        // ----- Update order -----
+        log.info("✅ Marking order {} as COMPLETED", orderNumber);
+
         order.setStatus(OrderStatus.COMPLETED);
         order.setCompletedAt(LocalDateTime.now());
         orderRepository.save(order);
 
+        // ----- Save Payment -----
         Payment payment = new Payment();
         payment.setOrder(order);
         payment.setAmount(amount);
-        payment.setPaymentMethod("SEPAY");
         payment.setTransactionId(transactionId);
+        payment.setPaymentMethod("SEPAY");
         payment.setStatus(PaymentStatus.SUCCESS);
         payment.setCreatedAt(LocalDateTime.now());
+
         paymentRepository.save(payment);
 
-        log.info("Order {} marked as PAID (transaction={})", orderNumber, transactionId);
+        log.info("🎉 Order {} paid successfully with transaction {}", orderNumber, transactionId);
+    }
+
+    // ---------- Helpers ----------
+    private String safe(Object... values) {
+        for (Object v : values) {
+            if (v != null && !String.valueOf(v).trim().isEmpty()) {
+                return String.valueOf(v).trim();
+            }
+        }
+        return null;
     }
 
     private Map<String, Object> parseJsonSafe(String json) {
         try {
             return objectMapper.readValue(json, Map.class);
         } catch (Exception e) {
-            log.warn("Invalid JSON payload: {}", e.getMessage());
+            log.error("❌ JSON parse error: {}", e.getMessage());
             return null;
         }
     }
 
-    private String safeString(Object o) {
-        return o == null ? null : String.valueOf(o).trim();
-    }
-
     private BigDecimal parseAmount(Object obj) {
-        if (obj == null) return null;
         try {
-            if (obj instanceof Number) {
-                return new BigDecimal(((Number) obj).toString());
-            } else {
-                String s = String.valueOf(obj).trim();
-                if (s.isEmpty()) return null;
-                return new BigDecimal(s);
-            }
+            if (obj == null) return null;
+
+            if (obj instanceof Number n) return new BigDecimal(n.toString());
+
+            String s = obj.toString().replace(",", "").trim();
+            return new BigDecimal(s);
         } catch (Exception e) {
-            log.warn("Failed to parse amount from {}: {}", obj, e.getMessage());
+            log.warn("❌ Cannot parse amount from {}", obj);
             return null;
         }
     }
 
     private String extractOrderNumber(String content) {
-        if (content == null) return null;
         Matcher m = ORDER_PATTERN.matcher(content);
         return m.find() ? m.group() : null;
     }
 }
+
