@@ -38,6 +38,7 @@ public class SecurityConfiguration {
                                 "/api/v1/payment/vnpay/**",
                                 "/api/v1/payments/vnpay/**"
                         ).permitAll()
+                        .requestMatchers("/api/v1/sepay/webhook").permitAll()
                         .requestMatchers("/api/v1/products/**", "/api/v1/categories/").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/payment/vnpay/callback").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/payment/vnpay/callback").permitAll()

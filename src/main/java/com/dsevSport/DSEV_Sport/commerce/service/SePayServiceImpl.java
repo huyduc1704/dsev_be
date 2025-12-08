@@ -24,66 +24,68 @@ import java.util.regex.Pattern;
 @Transactional
 @RequiredArgsConstructor
 public class SePayServiceImpl implements SePayService {
+
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
 
     private final Pattern ORDER_PATTERN = Pattern.compile("(ORD-\\d+|ORD_[A-Za-z0-9]+)");
+
     @Override
     public void processWebhook(String rawJson) {
+
         Map<String, Object> payload = parseJson(rawJson);
+        log.info("Parsed payload: {}", payload);
 
         String content = (String) payload.get("content");
-        Object transObj = payload.get("transactionId");
-
-        if (transObj == null) {
-            log.warn("Missing transactionId");
-            return;
-        }
-
-        String transactionId = transObj.toString();
-
+        String transactionId = String.valueOf(payload.get("transactionId"));
         BigDecimal amount = new BigDecimal(payload.get("transferAmount").toString());
 
         if (content == null || transactionId == null) {
-            log.warn("Invalid webhook payload: {}", payload);
+            log.warn("Missing content or transactionId");
             return;
         }
 
+        // Extract Order Number
         String orderNumber = extractOrderNumber(content);
-
         if (orderNumber == null) {
-            log.warn("No order number found in content: {}", content);
+            log.warn("Order number not found in content: {}", content);
             return;
         }
 
+        // Find order
         Order order = orderRepository.findByOrderNumber(orderNumber)
-                .orElseThrow(() -> new RuntimeException("Order not found"));
+                .orElseThrow(() -> new RuntimeException("Order not found: " + orderNumber));
 
+        // Already paid?
         if (order.getStatus() == OrderStatus.COMPLETED) {
             log.warn("Order {} already completed", orderNumber);
             return;
         }
 
+        // Check amount
         if (order.getTotalPrice().compareTo(amount) != 0) {
-            log.warn("Amount mismatch. Expected: {}, received {}", order.getTotalPrice(), amount);
+            log.warn("Amount mismatch for order {}: expected {}, actual {}", orderNumber, order.getTotalPrice(), amount);
             return;
         }
 
+        // Duplicate transaction
         if (paymentRepository.existsByTransactionId(transactionId)) {
             log.warn("Duplicate transaction: {}", transactionId);
             return;
         }
 
+        // Order already has payment?
         if (paymentRepository.existsByOrderId(order.getId())) {
-            log.warn("Order {} already has payment", orderNumber);
+            log.warn("Order {} already linked to a payment", orderNumber);
             return;
         }
 
+        // Update order status
         order.setStatus(OrderStatus.COMPLETED);
         order.setCompletedAt(LocalDateTime.now());
         orderRepository.save(order);
 
-        //create payment
+        // Create payment record
         Payment payment = new Payment();
         payment.setOrder(order);
         payment.setAmount(amount);
@@ -93,7 +95,7 @@ public class SePayServiceImpl implements SePayService {
         payment.setCreatedAt(LocalDateTime.now());
         paymentRepository.save(payment);
 
-        log.info("Order {} paid successfully", orderNumber);
+        log.info("Order {} successfully marked as PAID", orderNumber);
     }
 
     private Map<String, Object> parseJson(String json) {
@@ -109,3 +111,4 @@ public class SePayServiceImpl implements SePayService {
         return matcher.find() ? matcher.group() : null;
     }
 }
+
