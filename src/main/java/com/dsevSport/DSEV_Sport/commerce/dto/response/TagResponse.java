@@ -7,12 +7,11 @@ import java.util.UUID;
 
 @Data
 @Builder
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class CategoryResponse {
+public class TagResponse {
     UUID id;
     String name;
-    String description;
-    String imageUrl;
+    String displayName;
 }

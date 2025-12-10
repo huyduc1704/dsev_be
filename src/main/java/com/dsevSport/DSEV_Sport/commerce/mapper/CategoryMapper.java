@@ -16,6 +16,7 @@ public class CategoryMapper implements CrudMapper<Category, CategoryResponse, Ca
                 .id(entity.getId())
                 .name(entity.getName())
                 .description(entity.getDescription())
+                .imageUrl(entity.getImageUrl())
                 .build();
     }
 
@@ -24,6 +25,7 @@ public class CategoryMapper implements CrudMapper<Category, CategoryResponse, Ca
         return Category.builder()
                 .name(categoryRequest.getName())
                 .description(categoryRequest.getDescription())
+                .imageUrl(categoryRequest.getImageUrl())
                 .build();
     }
 
@@ -31,5 +33,6 @@ public class CategoryMapper implements CrudMapper<Category, CategoryResponse, Ca
     public void updateEntity(CategoryRequest categoryRequest, Category entity) {
         setIfNotNull(categoryRequest.getName(), entity::setName);
         setIfNotNull(categoryRequest.getDescription(), entity::setDescription);
+        setIfNotNull(categoryRequest.getImageUrl(), entity::setImageUrl);
     }
 }

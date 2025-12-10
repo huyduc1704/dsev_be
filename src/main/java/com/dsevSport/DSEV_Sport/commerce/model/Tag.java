@@ -8,24 +8,22 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Builder
+@Table(name = "tags")
 @Data
-@AllArgsConstructor
+@Builder
 @NoArgsConstructor
+@AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-@Table(name = "categories")
-public class Category {
+public class Tag {
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     UUID id;
 
-    @Column(name = "name", nullable = false, unique = true)
+    @Column(nullable = false, unique = true)
     String name;
 
-    String description;
-
-    @Column(name = "image_url")
-    String imageUrl;
+    String displayName; // Nam, Nữ, Trẻ em
 
     @Column(name = "created_at")
     LocalDateTime createdAt;

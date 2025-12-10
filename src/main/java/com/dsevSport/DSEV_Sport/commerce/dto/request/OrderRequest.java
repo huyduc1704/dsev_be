@@ -12,6 +12,13 @@ import java.util.UUID;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class OrderRequest {
     UUID addressId;
+
+    String fullName;
+    String phoneNumber;
+    String city;
+    String ward;
+    String street;
+
     String note;
 }
 

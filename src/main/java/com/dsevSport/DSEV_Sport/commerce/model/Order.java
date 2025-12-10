@@ -51,4 +51,20 @@ public class Order {
     LocalDateTime completedAt;
 
     String note;
+
+    // snapshot contact info for this order
+    @Column(name = "full_name")
+    String fullName;
+
+    @Column(name = "phone_number")
+    String phoneNumber;
+
+    @Column(name = "city")
+    String city;
+
+    @Column(name = "ward")
+    String ward;
+
+    @Column(name = "street")
+    String street;
 }

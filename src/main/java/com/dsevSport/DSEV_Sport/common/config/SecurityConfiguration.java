@@ -15,6 +15,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity(jsr250Enabled = true)
 @RequiredArgsConstructor
 public class SecurityConfiguration {
     private final AuthenticationProvider authenticationProvider;
@@ -26,29 +27,70 @@ public class SecurityConfiguration {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+                        // public: auth + swagger
                         .requestMatchers(
                                 "/api/v1/auth/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html"
                         ).permitAll()
-                        // allow all VNPay return endpoints
-                        .requestMatchers(
-                                "/api/v1/vnpay/**",
-                                "/api/v1/payment/vnpay/**",
-                                "/api/v1/payments/vnpay/**"
-                        ).permitAll()
+
+                        // public: SePay webhook + VNPAY callback
                         .requestMatchers("/api/v1/sepay/webhook").permitAll()
-                        .requestMatchers("/api/v1/products/**", "/api/v1/categories/").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/payment/vnpay/callback").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/payment/vnpay/callback").permitAll()
-                        .requestMatchers("/api/v1/users/profile").authenticated()
+
+                        // public: READ products & categories
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/v1/products/**",
+                                "/api/v1/categories/**",
+                                "/api/v1/tags/**"
+                        ).permitAll()
+
+                        // WRITE products & categories: ADMIN or MODERATOR
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/products/**",
+                                "/api/v1/categories/**",
+                                "/api/v1/tags/**"
+                        ).hasAnyRole("ADMIN", "MODERATOR")
+                        .requestMatchers(
+                                HttpMethod.PUT,
+                                "/api/v1/products/**",
+                                "/api/v1/categories/**",
+                                "/api/v1/tags/**"
+                        ).hasAnyRole("ADMIN", "MODERATOR")
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/api/v1/products/**",
+                                "/api/v1/categories/**",
+                                "/api/v1/tags/**"
+                        ).hasAnyRole("ADMIN", "MODERATOR")
+                        .requestMatchers(
+                                HttpMethod.DELETE,
+                                "/api/v1/products/**",
+                                "/api/v1/categories/**",
+                                "/api/v1/tags/**"
+                        ).hasAnyRole("ADMIN", "MODERATOR")
+
+                        // user images: require authentication (token)
+                        .requestMatchers("/api/v1/me/images/**").authenticated()
+
+                        // các API /api/v1/me/** khác (profile, cart, orders, tryon, addresses, ...)
+                        .requestMatchers("/api/v1/me/**").authenticated()
                         .requestMatchers("/api/v1/addresses/**").authenticated()
+                        .requestMatchers("/api/v1/orders/**").authenticated()
+                        .requestMatchers("/api/v1/tryon/**").authenticated()
+                        .requestMatchers("/api/v1/payment/**").authenticated()
+
+                        // mọi request khác: cần authentication
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
         return http.build();
     }
 
