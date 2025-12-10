@@ -27,64 +27,15 @@ public class SecurityConfiguration {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // public: auth + swagger
-                        .requestMatchers(
-                                "/api/v1/auth/**",
-                                "/v3/api-docs/**",
-                                "/swagger-ui/**",
-                                "/swagger-ui.html"
-                        ).permitAll()
-
-                        // public: SePay webhook + VNPAY callback
+                        .requestMatchers("/api/v1/auth/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/api/v1/sepay/webhook").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/payment/vnpay/callback").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/payment/vnpay/callback").permitAll()
-
-                        // public: READ products & categories
-                        .requestMatchers(
-                                HttpMethod.GET,
-                                "/api/v1/products/**",
-                                "/api/v1/categories/**",
-                                "/api/v1/tags/**"
-                        ).permitAll()
-
-                        // WRITE products & categories: ADMIN or MODERATOR
-                        .requestMatchers(
-                                HttpMethod.POST,
-                                "/api/v1/products/**",
-                                "/api/v1/categories/**",
-                                "/api/v1/tags/**"
-                        ).hasAnyRole("ADMIN", "MODERATOR")
-                        .requestMatchers(
-                                HttpMethod.PUT,
-                                "/api/v1/products/**",
-                                "/api/v1/categories/**",
-                                "/api/v1/tags/**"
-                        ).hasAnyRole("ADMIN", "MODERATOR")
-                        .requestMatchers(
-                                HttpMethod.PATCH,
-                                "/api/v1/products/**",
-                                "/api/v1/categories/**",
-                                "/api/v1/tags/**"
-                        ).hasAnyRole("ADMIN", "MODERATOR")
-                        .requestMatchers(
-                                HttpMethod.DELETE,
-                                "/api/v1/products/**",
-                                "/api/v1/categories/**",
-                                "/api/v1/tags/**"
-                        ).hasAnyRole("ADMIN", "MODERATOR")
-
-                        // user images: require authentication (token)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/products/**", "/api/v1/categories/**", "/api/v1/tags/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/products/**", "/api/v1/categories/**", "/api/v1/tags/**").hasAnyRole("ADMIN", "MODERATOR")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/products/**", "/api/v1/categories/**", "/api/v1/tags/**").hasAnyRole("ADMIN", "MODERATOR")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/products/**", "/api/v1/categories/**", "/api/v1/tags/**").hasAnyRole("ADMIN", "MODERATOR")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/products/**", "/api/v1/categories/**", "/api/v1/tags/**").hasAnyRole("ADMIN", "MODERATOR")
                         .requestMatchers("/api/v1/me/images/**").authenticated()
-
-                        // các API /api/v1/me/** khác (profile, cart, orders, tryon, addresses, ...)
-                        .requestMatchers("/api/v1/me/**").authenticated()
-                        .requestMatchers("/api/v1/addresses/**").authenticated()
-                        .requestMatchers("/api/v1/orders/**").authenticated()
-                        .requestMatchers("/api/v1/tryon/**").authenticated()
-                        .requestMatchers("/api/v1/payment/**").authenticated()
-
-                        // mọi request khác: cần authentication
+                        .requestMatchers("/api/v1/me/**", "/api/v1/addresses/**", "/api/v1/orders/**", "/api/v1/tryon/**", "/api/v1/payment/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -93,8 +44,4 @@ public class SecurityConfiguration {
 
         return http.build();
     }
-
-    @Configuration
-    @EnableMethodSecurity
-    public class MethodSecurityConfig { }
 }

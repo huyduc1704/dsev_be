@@ -10,8 +10,8 @@ import java.util.UUID;
 public interface CategoryService {
     List<CategoryResponse> getAllCategories();
     CategoryResponse getCategoryById(UUID id);
-    CategoryResponse createCategory(CategoryRequest request, MultipartFile image);
-    CategoryResponse updateCategory(UUID id, CategoryRequest request, MultipartFile image);
+    CategoryResponse createCategory(CategoryRequest request);
+    CategoryResponse updateCategory(UUID id, CategoryRequest request);
     void deleteCategory(UUID id);
     CategoryResponse uploadCategoryImage(UUID id, MultipartFile image);
 }

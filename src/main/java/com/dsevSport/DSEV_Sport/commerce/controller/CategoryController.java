@@ -8,9 +8,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.security.PermitAll;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -21,6 +24,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/categories")
 @RequiredArgsConstructor
+@Slf4j
 public class CategoryController {
     private final CategoryService service;
 
@@ -51,11 +55,16 @@ public class CategoryController {
     @PreAuthorize("hasAnyRole('ADMIN','MODERATOR')")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<CategoryResponse>> createCategory(
-            @Valid @RequestPart("request") CategoryRequest request,
-            @RequestPart(value = "image", required = false) MultipartFile image) {
+            @Valid @RequestPart("category") CategoryRequest request) {
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        log.info("createCategory called by principal: {}, authorities: {}",
+                auth != null ? auth.getName() : "null",
+                auth != null ? auth.getAuthorities() : "null");
+
         return ResponseEntity.ok(
                 ApiResponse.<CategoryResponse>builder()
-                        .data(service.createCategory(request, image))
+                        .data(service.createCategory(request))
                         .message("Category created successfully")
                         .code(200)
                         .build()
@@ -66,11 +75,17 @@ public class CategoryController {
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<CategoryResponse>> updateCategory(
             @PathVariable UUID id,
-            @Valid @RequestPart("request") CategoryRequest request,
-            @RequestPart(value = "image", required = false) MultipartFile image) {
+            @Valid @RequestPart("category") CategoryRequest request) {
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        log.info("updateCategory called by principal: {}, authorities: {}, categoryId: {}",
+                auth != null ? auth.getName() : "null",
+                auth != null ? auth.getAuthorities() : "null",
+                id);
+
         return ResponseEntity.ok(
                 ApiResponse.<CategoryResponse>builder()
-                        .data(service.updateCategory(id, request, image))
+                        .data(service.updateCategory(id, request))
                         .message("Category updated successfully")
                         .code(200)
                         .build()

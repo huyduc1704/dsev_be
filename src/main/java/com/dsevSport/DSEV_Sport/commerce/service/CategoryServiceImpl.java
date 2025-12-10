@@ -44,28 +44,28 @@ public class CategoryServiceImpl implements CategoryService {
     }
 
     @Override
-    public CategoryResponse createCategory(CategoryRequest request, MultipartFile image) {
+    public CategoryResponse createCategory(CategoryRequest request) {
+        log.info("Service.createCategory called with name: {}", request.getName());
+
         if (categoryRepository.existsByNameIgnoreCase(request.getName())) {
             throw new IllegalArgumentException("Category name already exists: " + request.getName());
         }
         Category category = categoryMapper.toEntity(request);
-        if (image != null && !image.isEmpty()) {
-            category.setImageUrl(uploadImage(image));
-        }
+
         return categoryMapper.toResponse(categoryRepository.save(category));
     }
 
     @Override
-    public CategoryResponse updateCategory(UUID id, CategoryRequest request, MultipartFile image) {
+    public CategoryResponse updateCategory(UUID id, CategoryRequest request) {
+        log.info("Service.updateCategory called with id: {}, name: {}", id, request.getName());
+
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Category not found with id: " + id));
         if (categoryRepository.existsByNameIgnoreCaseAndIdNot(request.getName(), id)) {
             throw new IllegalArgumentException("Category name already exists: " + request.getName());
         }
         categoryMapper.updateEntity(request, category);
-        if (image != null && !image.isEmpty()) {
-            category.setImageUrl(uploadImage(image));
-        }
+
         return categoryMapper.toResponse(categoryRepository.save(category));
     }
 
