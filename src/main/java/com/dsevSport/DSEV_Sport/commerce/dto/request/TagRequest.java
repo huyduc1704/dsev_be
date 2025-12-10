@@ -1,17 +1,14 @@
 package com.dsevSport.DSEV_Sport.commerce.dto.request;
 
-import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 @Data
 @Builder
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class CategoryRequest {
-    @NotBlank(message = "Name is required")
+public class TagRequest {
     String name;
-    String description;
-    String imageUrl;
+    String displayName; // Nam, Nữ, Trẻ em
 }

@@ -1,9 +1,8 @@
 package com.dsevSport.DSEV_Sport.commerce.controller;
 
-import com.dsevSport.DSEV_Sport.commerce.dto.request.PaymentRequest;
 import com.dsevSport.DSEV_Sport.commerce.dto.request.SePayRequest;
 import com.dsevSport.DSEV_Sport.commerce.dto.response.ApiResponse;
-import com.dsevSport.DSEV_Sport.commerce.dto.response.PaymentResponse;
+import com.dsevSport.DSEV_Sport.commerce.dto.response.PaymentStatusResponse;
 import com.dsevSport.DSEV_Sport.commerce.dto.response.SePayResponse;
 import com.dsevSport.DSEV_Sport.commerce.model.Order;
 import com.dsevSport.DSEV_Sport.commerce.model.Payment;
@@ -11,17 +10,17 @@ import com.dsevSport.DSEV_Sport.commerce.repository.OrderRepository;
 import com.dsevSport.DSEV_Sport.commerce.repository.PaymentRepository;
 import com.dsevSport.DSEV_Sport.commerce.service.PaymentService;
 import com.dsevSport.DSEV_Sport.common.config.SePayConfig;
+import com.dsevSport.DSEV_Sport.common.security.OwnershipChecker;
 import com.dsevSport.DSEV_Sport.common.util.SePayQrBuilder;
 import com.dsevSport.DSEV_Sport.common.util.enums.OrderStatus;
 import com.dsevSport.DSEV_Sport.common.util.enums.PaymentStatus;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.annotation.security.PermitAll;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -35,64 +34,7 @@ public class PaymentController {
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
     private final SePayConfig config;
-
-    @PostMapping("/payments/vnpay")
-    public ResponseEntity<ApiResponse<PaymentResponse>> createVNPayPayment(
-            @RequestBody PaymentRequest request,
-            HttpServletRequest httpServletRequest) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(
-                ApiResponse.<PaymentResponse>builder()
-                        .message("Payment URL created successfully")
-                        .data(paymentService.createVNPayPayment(request, httpServletRequest))
-                        .code(201)
-                        .build()
-        );
-    }
-
-    @GetMapping("/payments/vnpay/return")
-    public ResponseEntity<Void> handleVNPayReturn(HttpServletRequest request) {
-        paymentService.handleVNPayReturn(request);
-        return ResponseEntity.noContent().build();
-    }
-    @PermitAll
-    @GetMapping(value = "/vnpay/return-app", produces = "text/html; charset=UTF-8")
-    public String vnpayReturnApp(HttpServletRequest request) {
-        paymentService.handleVNPayReturn(request);
-        StringBuilder html = new StringBuilder();
-        html.append("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>VNPay Redirect</title></head><body>");
-        html.append("<script>");
-        html.append("const params = window.location.search;");
-        html.append("const target = 'dsev://vnpay/callback' + params;");
-        html.append("window.location.href = target;");
-        html.append("</script>");
-        html.append("<p>Đang chuyển hướng về ứng dụng...</p>");
-        html.append("</body></html>");
-        return html.toString();
-    }
-
-    @GetMapping("/orders/{orderId}/payment")
-    public ResponseEntity<ApiResponse<PaymentResponse>> getPaymentByOrder(
-            @PathVariable UUID orderId) {
-        return ResponseEntity.ok(
-                ApiResponse.<PaymentResponse>builder()
-                        .message("Payment retrieved successfully")
-                        .data(paymentService.getPaymentByOrderId(orderId))
-                        .code(200)
-                        .build()
-        );
-    }
-
-    @GetMapping("/payments")
-    public ResponseEntity<ApiResponse<PaymentResponse>> getPaymentByTransactionId(
-            @RequestParam String transactionId) {
-        return ResponseEntity.ok(
-                ApiResponse.<PaymentResponse>builder()
-                        .message("Payment retrieved successfully")
-                        .data(paymentService.getPaymentStatus(transactionId))
-                        .code(200)
-                        .build()
-        );
-    }
+    private final OwnershipChecker ownershipChecker;
 
     @PostMapping("/sepay")
     public ResponseEntity<ApiResponse<SePayResponse>> createSePayQR(@RequestBody SePayRequest request) {
@@ -142,6 +84,34 @@ public class PaymentController {
                         .message("Created payment successfully")
                         .code(200)
                         .data(response)
+                        .build()
+        );
+    }
+
+    @GetMapping("/payment/status")
+    public ResponseEntity<ApiResponse<PaymentStatusResponse>> getPaymentStatus(
+            @RequestParam UUID orderId,
+            Principal principal
+    ) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        String principalName = principal == null ? null : principal.getName();
+        if (ownershipChecker.isOwnerOrAdmin(order, principalName)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.<PaymentStatusResponse>builder()
+                            .code(403)
+                            .message("You are not allowed to view this payment")
+                            .build());
+        }
+
+        var status = paymentService.getPaymentStatus(orderId);
+
+        return ResponseEntity.ok(
+                ApiResponse.<PaymentStatusResponse>builder()
+                        .code(200)
+                        .data(status)
+                        .message("Fetched payment status successfully")
                         .build()
         );
     }

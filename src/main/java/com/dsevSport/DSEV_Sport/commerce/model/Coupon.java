@@ -54,8 +54,7 @@ public class Coupon {
     public boolean isValid() {
         if (!isActive) return false;
         if (currentUses >= maxUses) return false;
-        if (expiresAt != null && LocalDateTime.now().isAfter(expiresAt)) return false;
-        return true;
+        return expiresAt == null || !LocalDateTime.now().isAfter(expiresAt);
     }
 
     public void incrementUsage() {

@@ -40,10 +40,13 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         // 2. Address check
-        Address address = addressRepo.findById(request.getAddressId())
-                .orElseThrow(() -> new RuntimeException("Address not found"));
-        if (!address.getUser().getId().equals(user.getId())) {
-            throw new RuntimeException("Address does not belong to user");
+        Address address = null;
+        if (request.getAddressId() != null) {
+            address = addressRepo.findById(request.getAddressId())
+                    .orElseThrow(() -> new RuntimeException("Address not found"));
+            if (!address.getUser().getId().equals(user.getId())) {
+                throw new RuntimeException("Address does not belong to user");
+            }
         }
 
         // 3. Cart
@@ -81,6 +84,14 @@ public class OrderServiceImpl implements OrderService {
         order.setNote(request.getNote());
         order.setCreatedAt(LocalDateTime.now());
         order.setUpdatedAt(LocalDateTime.now());
+
+        // snapshot contact/address info
+        order.setFullName(request.getFullName());
+        order.setPhoneNumber(request.getPhoneNumber());
+        order.setCity(request.getCity());
+        order.setWard(request.getWard());
+        order.setStreet(request.getStreet());
+
         orderRepo.save(order);
 
         // 6. Create order items
@@ -103,7 +114,7 @@ public class OrderServiceImpl implements OrderService {
         cartRepo.save(cart);
 
         log.info("Order created: {}, user={}, total={}", order.getOrderNumber(), user.getId(), totalPrice);
-        return toOrderResponse(order, address, itemResponses);
+        return toOrderResponse(order, itemResponses);
     }
 
     @Override
@@ -115,7 +126,7 @@ public class OrderServiceImpl implements OrderService {
                             .stream()
                             .map(this::toOrderItemResponse)
                             .collect(Collectors.toList());
-                    return toOrderResponse(order, order.getAddress(), items);
+                    return toOrderResponse(order, items);
                 })
                 .collect(Collectors.toList());
     }
@@ -138,7 +149,7 @@ public class OrderServiceImpl implements OrderService {
                 .collect(Collectors.toList());
 
         log.info("Order {} status updated to {}", order.getOrderNumber(), status);
-        return toOrderResponse(order, order.getAddress(), items);
+        return toOrderResponse(order, items);
     }
 
     @Override
@@ -173,7 +184,7 @@ public class OrderServiceImpl implements OrderService {
         log.info("Order {} canceled by user {}", order.getOrderNumber(), username);
     }
 
-    private OrderResponse toOrderResponse(Order order, Address address, List<OrderItemResponse> items) {
+    private OrderResponse toOrderResponse(Order order, List<OrderItemResponse> items) {
         return OrderResponse.builder()
                 .id(order.getId())
                 .orderNumber(order.getOrderNumber())
@@ -183,11 +194,11 @@ public class OrderServiceImpl implements OrderService {
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())
                 .completedAt(order.getCompletedAt())
-                .fullName(address != null ? address.getFullName() : null)
-                .phoneNumber(address != null ? address.getPhoneNumber() : null)
-                .city(address != null ? address.getCity() : null)
-                .ward(address != null ? address.getWard() : null)
-                .street(address != null ? address.getStreet() : null)
+                .fullName(order.getFullName())
+                .phoneNumber(order.getPhoneNumber())
+                .city(order.getCity())
+                .ward(order.getWard())
+                .street(order.getStreet())
                 .items(items)
                 .build();
     }
