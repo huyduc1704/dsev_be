@@ -53,9 +53,9 @@ public class CategoryController {
     }
 
     @PreAuthorize("hasAnyRole('ADMIN','MODERATOR')")
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping
     public ResponseEntity<ApiResponse<CategoryResponse>> createCategory(
-            @Valid @RequestPart("category") CategoryRequest request) {
+            @Valid @RequestBody CategoryRequest request) {
 
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         log.info("createCategory called by principal: {}, authorities: {}",
@@ -72,10 +72,10 @@ public class CategoryController {
     }
 
     @PreAuthorize("hasAnyRole('ADMIN','MODERATOR')")
-    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<CategoryResponse>> updateCategory(
             @PathVariable UUID id,
-            @Valid @RequestPart("category") CategoryRequest request) {
+            @Valid @RequestBody CategoryRequest request) {
 
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         log.info("updateCategory called by principal: {}, authorities: {}, categoryId: {}",
