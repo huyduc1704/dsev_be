@@ -97,7 +97,7 @@ public class PaymentController {
                 .orElseThrow(() -> new RuntimeException("Order not found"));
 
         String principalName = principal == null ? null : principal.getName();
-        if (ownershipChecker.isOwnerOrAdmin(order, principalName)) {
+        if (!ownershipChecker.isOwnerOrAdmin(order, principalName)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(ApiResponse.<PaymentStatusResponse>builder()
                             .code(403)
