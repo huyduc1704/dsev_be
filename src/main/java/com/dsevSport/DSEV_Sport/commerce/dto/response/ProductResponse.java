@@ -23,4 +23,5 @@ public class ProductResponse {
     Boolean isActive;
     UUID categoryId;
     List<ProductVariantResponse> variants;
+    List<TagResponse> tags;
 }

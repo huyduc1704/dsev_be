@@ -134,4 +134,36 @@ public class ProductController {
         return ResponseEntity.noContent().build();
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN','MODERATOR')")
+    @PostMapping("/{productId}/tags")
+    public ResponseEntity<ApiResponse<ProductResponse>> addTagsToProduct(
+            @PathVariable UUID productId,
+            @RequestBody List<UUID> tagIds) {
+
+        ProductResponse data = service.addTagsToProduct(productId, tagIds);
+        return ResponseEntity.ok(
+                ApiResponse.<ProductResponse>builder()
+                        .data(data)
+                        .message("Tags added to product successfully")
+                        .code(200)
+                        .build()
+        );
+    }
+
+    @PreAuthorize("hasAnyRole('ADMIN','MODERATOR')")
+    @DeleteMapping("/{productId}/tags/{tagId}")
+    public ResponseEntity<ApiResponse<ProductResponse>> removeTagFromProduct(
+            @PathVariable UUID productId,
+            @PathVariable UUID tagId) {
+
+        ProductResponse data = service.removeTagFromProduct(productId, tagId);
+        return ResponseEntity.ok(
+                ApiResponse.<ProductResponse>builder()
+                        .data(data)
+                        .message("Tag removed from product successfully")
+                        .code(200)
+                        .build()
+        );
+    }
+
 }

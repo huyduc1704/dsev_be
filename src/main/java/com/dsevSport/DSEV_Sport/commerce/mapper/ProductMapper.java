@@ -2,6 +2,7 @@ package com.dsevSport.DSEV_Sport.commerce.mapper;
 
 import com.dsevSport.DSEV_Sport.commerce.dto.request.ProductRequest;
 import com.dsevSport.DSEV_Sport.commerce.dto.response.ProductResponse;
+import com.dsevSport.DSEV_Sport.commerce.dto.response.TagResponse;
 import com.dsevSport.DSEV_Sport.commerce.model.Category;
 import com.dsevSport.DSEV_Sport.commerce.model.Product;
 import com.dsevSport.DSEV_Sport.commerce.model.ProductImage;
@@ -24,6 +25,17 @@ public class ProductMapper implements CrudMapper<Product, ProductResponse, Produ
                         entity.getImages() != null
                         ? entity.getImages().stream()
                                 .map(ProductImage::getImageUrl)
+                                .toList()
+                                : List.of()
+                )
+                .tags(
+                        entity.getTags() != null
+                                ? entity.getTags().stream()
+                                .map(tag -> TagResponse.builder()
+                                        .id(tag.getId())
+                                        .name(tag.getName())
+                                        .displayName(tag.getDisplayName())
+                                        .build())
                                 .toList()
                                 : List.of()
                 )

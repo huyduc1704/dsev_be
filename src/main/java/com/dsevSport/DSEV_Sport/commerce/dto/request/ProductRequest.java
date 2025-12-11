@@ -3,6 +3,7 @@ package com.dsevSport.DSEV_Sport.commerce.dto.request;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -16,4 +17,5 @@ public class ProductRequest {
     String brand;
     Boolean isActive;
     UUID categoryId;
+    List<UUID> tagIds;
 }

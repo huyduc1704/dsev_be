@@ -25,4 +25,6 @@ public interface ProductService {
             Boolean active,
             UUID categoryId,
             Pageable pageable);
+    ProductResponse addTagsToProduct(UUID productId, List<UUID> tagIds);
+    ProductResponse removeTagFromProduct(UUID productId, UUID tagId);
 }

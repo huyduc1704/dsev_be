@@ -5,9 +5,12 @@ import com.dsevSport.DSEV_Sport.commerce.dto.response.ProductResponse;
 import com.dsevSport.DSEV_Sport.commerce.mapper.ProductMapper;
 import com.dsevSport.DSEV_Sport.commerce.mapper.ProductVariantMapper;
 import com.dsevSport.DSEV_Sport.commerce.model.Product;
+import com.dsevSport.DSEV_Sport.commerce.model.Tag;
 import com.dsevSport.DSEV_Sport.commerce.repository.ProductRepository;
 import com.dsevSport.DSEV_Sport.commerce.repository.ProductVariantRepository;
+import com.dsevSport.DSEV_Sport.commerce.repository.TagRepository;
 import com.dsevSport.DSEV_Sport.commerce.specification.ProductSpecification;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,11 +22,13 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class ProductServiceImpl implements ProductService {
     private final ProductRepository repository;
     private final ProductMapper mapper;
     private final ProductVariantRepository variantRepository;
     private final ProductVariantMapper variantMapper;
+    private final TagRepository tagRepository;
 
     @Override
     public List<ProductResponse> getAllProducts() {
@@ -63,21 +68,94 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Transactional
     public ProductResponse createProduct(ProductRequest request) {
         Product product = mapper.toEntity(request);
         product.setId(UUID.randomUUID());
-        ProductResponse resp = mapper.toResponse(repository.save(product));
+
+        // Handle tags
+        if (request.getTagIds() != null && !request.getTagIds().isEmpty()) {
+            List<Tag> tags = tagRepository.findAllById(request.getTagIds());
+            if (tags.size() != request.getTagIds().size()) {
+                throw new IllegalArgumentException("One or more tags not found");
+            }
+            product.setTags(tags);
+        }
+
+        Product savedProduct = repository.save(product);
+        ProductResponse resp = mapper.toResponse(savedProduct);
         resp.setVariants(variantMapper.toResponseList(variantRepository.findByProductId(resp.getId())));
         return resp;
     }
 
     @Override
+    @Transactional
     public ProductResponse updateProduct(UUID id, ProductRequest request) {
         Product product = repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found with id: " + id));
+
         mapper.updateEntity(request, product);
-        ProductResponse resp = mapper.toResponse(repository.save(product));
+
+        // Handle tags update
+        if (request.getTagIds() != null) {
+            if (request.getTagIds().isEmpty()) {
+                // Clear all tags
+                product.getTags().clear();
+            } else {
+                // Update tags
+                List<Tag> tags = tagRepository.findAllById(request.getTagIds());
+                if (tags.size() != request.getTagIds().size()) {
+                    throw new IllegalArgumentException("One or more tags not found");
+                }
+                product.getTags().clear();
+                product.getTags().addAll(tags);
+            }
+        }
+
+        Product savedProduct = repository.save(product);
+        ProductResponse resp = mapper.toResponse(savedProduct);
         resp.setVariants(variantMapper.toResponseList(variantRepository.findByProductId(id)));
+        return resp;
+    }
+
+    @Override
+    @Transactional
+    public ProductResponse addTagsToProduct(UUID productId, List<UUID> tagIds) {
+        Product product = repository.findById(productId)
+                .orElseThrow(() -> new IllegalArgumentException("Product not found"));
+
+        List<Tag> tagsToAdd = tagRepository.findAllById(tagIds);
+        if (tagsToAdd.size() != tagIds.size()) {
+            throw new IllegalArgumentException("One or more tags not found");
+        }
+
+        // Tránh duplicate tags
+        tagsToAdd.forEach(tag -> {
+            if (!product.getTags().contains(tag)) {
+                product.getTags().add(tag);
+            }
+        });
+
+        Product savedProduct = repository.save(product);
+        ProductResponse resp = mapper.toResponse(savedProduct);
+        resp.setVariants(variantMapper.toResponseList(variantRepository.findByProductId(productId)));
+        return resp;
+    }
+
+    @Override
+    @Transactional
+    public ProductResponse removeTagFromProduct(UUID productId, UUID tagId) {
+        Product product = repository.findById(productId)
+                .orElseThrow(() -> new IllegalArgumentException("Product not found"));
+
+        Tag tag = tagRepository.findById(tagId)
+                .orElseThrow(() -> new IllegalArgumentException("Tag not found"));
+
+        product.getTags().remove(tag);
+
+        Product savedProduct = repository.save(product);
+        ProductResponse resp = mapper.toResponse(savedProduct);
+        resp.setVariants(variantMapper.toResponseList(variantRepository.findByProductId(productId)));
         return resp;
     }
 
