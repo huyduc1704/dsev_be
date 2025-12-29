@@ -4,7 +4,12 @@ from fastapi.middleware.cors import CORSMiddleware
 import cv2
 from ai_module import VirtualTryOnAI # Import class vừa tạo ở trên
 
+
 app = FastAPI()
+
+@app.get("/")
+def index():
+    return {"message": "Server AI đang chạy! Hãy vào /video_feed để xem camera."}
 
 # Cho phép FE gọi vào
 app.add_middleware(
